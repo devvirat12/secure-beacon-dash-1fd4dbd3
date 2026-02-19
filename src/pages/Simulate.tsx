@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, AlertCircle } from "lucide-react";
-import { AnalysisResult, RiskLevel } from "@/lib/types";
+import { AnalysisResult, RiskLevel, ScoringResult } from "@/lib/types";
 import { useDemo } from "@/lib/demo-context";
-import { generateDemoAnalysis } from "@/lib/mock-data";
+import { userDataset } from "@/lib/dataset";
+import { scoreTransaction } from "@/lib/scoring-engine";
 import { analyzeTransaction, confirmTransaction } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,7 +55,8 @@ const Simulate = () => {
       let analysis: AnalysisResult;
       if (demoMode) {
         await new Promise((r) => setTimeout(r, 800));
-        analysis = generateDemoAnalysis(parseFloat(amount), location);
+        const user = userDataset[0]; // Use first dataset user for simulation
+        analysis = scoreTransaction(`sim-${Date.now()}`, parseFloat(amount), location, user);
       } else {
         analysis = await analyzeTransaction({
           userId: "demo-user-001",
