@@ -355,63 +355,52 @@ export function computeRuleScore(
  * Isolation Forest — linear scaling for extreme deviations.
  */
 export function computeIsolationForestScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
-  const features: { name: string; signal: number; weight: number }[] = [
-    {
-      name: "Amount Deviation",
-      signal: Math.min(metrics.amountDeviation / 10, 1),
-      weight: 0.22,
-    },
-    {
-      name: "Spend Ratio",
-      signal: Math.min((metrics.salaryRatio ?? metrics.monthlySpendRatio - 1) / 1.5, 1),
-      weight: 0.13,
-    },
-    {
-      name: "Location Anomaly",
-      signal: metrics.locationFlag ? 1 : 0,
-      weight: 0.15,
-    },
-    {
-      name: "Frequency Spike",
-      signal: metrics.frequencySpike ? 0.85 : 0,
-      weight: 0.10,
-    },
-    {
-      name: "Time Pattern",
-      signal: metrics.transactionTimeRisk,
-      weight: 0.08,
-    },
-    {
-      name: "Geo-Velocity",
-      signal: metrics.geoVelocityFlag ? 1 : 0,
-      weight: 0.10,
-    },
-    {
-      name: "Device Change",
-      signal: metrics.deviceChangeFlag ? 0.9 : 0,
-      weight: 0.07,
-    },
-    {
-      name: "Account Age",
-      signal: metrics.accountAgeDays < 30 ? 1 : metrics.accountAgeDays < 90 ? 0.4 : 0,
-      weight: 0.05,
-    },
-    {
-      name: "Rapid Small Txns",
-      signal: metrics.rapidSmallTransactionsFlag ? 0.8 : 0,
-      weight: 0.04,
-    },
-    {
-      name: "Behavioral Drift",
-      signal: Math.min(metrics.behavioralDriftScore / 80, 1),
-      weight: 0.06,
-    },
+  // Cross-feature interaction multipliers: co-occurring anomalies amplify each other
+  const locationAndAmount = metrics.locationFlag && metrics.amountDeviation > 3 ? 1.25 : 1.0;
+  const newUpiAndHighAmount = metrics.isFirstTimeBeneficiary && metrics.amountDeviation > 4 ? 1.20 : 1.0;
+  const fraudHistoryAmplifier = metrics.historicalFraudExposureFlag ? 1.15 : 1.0;
+  const newAccountHighAmount = metrics.accountAgeDays < 60 && metrics.amountDeviation > 5 ? 1.30 : 1.0;
+  const nightAndNewCity = metrics.isNightTransaction && metrics.locationFlag ? 1.20 : 1.0;
+
+  // Sigmoid-shaped amount deviation: steeper curve for moderate anomalies, asymptotes at extremes
+  const rawDev = metrics.amountDeviation;
+  const amountSignal =
+    rawDev <= 1 ? 0 :
+    rawDev <= 3 ? (rawDev - 1) / 2 * 0.2 :           // 1-3x: very low (0–0.2)
+    rawDev <= 8 ? 0.2 + (rawDev - 3) / 5 * 0.35 :    // 3-8x: moderate (0.2–0.55)
+    rawDev <= 20 ? 0.55 + (rawDev - 8) / 12 * 0.3 :  // 8-20x: high (0.55–0.85)
+    Math.min(0.85 + (rawDev - 20) / 30 * 0.15, 1.0); // 20x+: near max (0.85–1.0)
+
+  // Spend/salary ratio: sharper penalty for exceeding monthly salary
+  const salaryRatio = metrics.salaryRatio ?? 0;
+  const spendSignal =
+    salaryRatio <= 0.3 ? 0 :
+    salaryRatio <= 0.6 ? (salaryRatio - 0.3) / 0.3 * 0.15 :
+    salaryRatio <= 1.0 ? 0.15 + (salaryRatio - 0.6) / 0.4 * 0.35 :
+    Math.min(0.5 + (salaryRatio - 1.0) / 2 * 0.5, 1.0);
+
+  const features: { name: string; signal: number; weight: number; multiplier: number }[] = [
+    { name: "Amount Deviation",   signal: amountSignal,                                             weight: 0.24, multiplier: locationAndAmount * newUpiAndHighAmount * newAccountHighAmount },
+    { name: "Spend Ratio",        signal: spendSignal,                                              weight: 0.12, multiplier: 1.0 },
+    { name: "Location Anomaly",   signal: metrics.locationFlag ? 1 : 0,                            weight: 0.14, multiplier: nightAndNewCity },
+    { name: "Frequency Spike",    signal: metrics.frequencySpike ? 0.85 : 0,                       weight: 0.09, multiplier: 1.0 },
+    { name: "Time Pattern",       signal: metrics.transactionTimeRisk,                             weight: 0.07, multiplier: 1.0 },
+    { name: "Geo-Velocity",       signal: metrics.geoVelocityFlag ? 1 : 0,                         weight: 0.10, multiplier: 1.0 },
+    { name: "Device Change",      signal: metrics.deviceChangeFlag ? 0.9 : 0,                      weight: 0.07, multiplier: 1.0 },
+    { name: "Account Age",        signal: metrics.accountAgeDays < 20 ? 1 : metrics.accountAgeDays < 60 ? 0.6 : metrics.accountAgeDays < 120 ? 0.25 : 0, weight: 0.06, multiplier: newAccountHighAmount },
+    { name: "Rapid Small Txns",   signal: metrics.rapidSmallTransactionsFlag ? 0.8 : 0,            weight: 0.04, multiplier: 1.0 },
+    { name: "Behavioral Drift",   signal: Math.min(metrics.behavioralDriftScore / 70, 1),          weight: 0.06, multiplier: 1.0 },
+    { name: "Fraud History",      signal: metrics.historicalFraudExposureFlag ? Math.min(1, 0.4 + metrics.amountDeviation / 20) : 0, weight: 0.04, multiplier: fraudHistoryAmplifier },
+    { name: "Beneficiary Risk",   signal: Math.min(metrics.beneficiaryRiskScore / 100, 1) * (newUpiAndHighAmount - 1 + 1), weight: 0.04, multiplier: 1.0 },
   ];
+
+  // Normalize weights (they may sum slightly over 1 after adding new features)
+  const totalWeight = features.reduce((s, f) => s + f.weight, 0);
 
   const contributions: Record<string, number> = {};
   let weightedSum = 0;
   for (const f of features) {
-    const contrib = f.signal * f.weight * 100;
+    const contrib = f.signal * (f.weight / totalWeight) * f.multiplier * 100;
     contributions[f.name] = Math.round(contrib);
     weightedSum += contrib;
   }
@@ -426,32 +415,85 @@ export function computeIsolationForestScore(metrics: DeviationMetrics): { score:
 export function computeLightGBMScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
   const contributions: Record<string, number> = {};
 
-  contributions["Beneficiary Risk"] = Math.round(metrics.beneficiaryRiskScore * 0.3);
-  contributions["First-Time Beneficiary"] = metrics.isFirstTimeBeneficiary ? 15 : 0;
-  contributions["UPI Account Age"] = metrics.upiAgeDays < 7 ? 20 : metrics.upiAgeDays < 30 ? 10 : 0;
+  // Beneficiary risk: weighted by account age severity
+  const bRisk = metrics.beneficiaryRiskScore;
+  contributions["Beneficiary Risk"] = Math.round(bRisk * 0.28);
 
-  // Enhanced payment link risk with deep inspection
+  // First-time beneficiary: more weight when high amount involved
+  const ftbBoost = metrics.isFirstTimeBeneficiary
+    ? (metrics.amountDeviation > 5 ? 20 : metrics.amountDeviation > 2 ? 16 : 12)
+    : 0;
+  contributions["First-Time Beneficiary"] = ftbBoost;
+
+  // UPI age: graduated penalty
+  const upiAgeContrib =
+    metrics.upiAgeDays < 3  ? 25 :
+    metrics.upiAgeDays < 7  ? 20 :
+    metrics.upiAgeDays < 14 ? 14 :
+    metrics.upiAgeDays < 30 ? 9  : 0;
+  contributions["UPI Account Age"] = upiAgeContrib;
+
+  // Payment link risk with deep inspection
   let linkContrib = 0;
   if (metrics.isPaymentLink) {
-    linkContrib = metrics.linkRiskScore > 0 ? metrics.linkRiskScore : (metrics.linkRisk === "new" ? 20 : metrics.linkRisk === "unknown" ? 15 : 3);
+    if (metrics.linkRiskScore > 0) {
+      linkContrib = metrics.linkRiskScore;
+    } else {
+      linkContrib = metrics.linkRisk === "new" ? 22 : metrics.linkRisk === "unknown" ? 16 : 4;
+    }
   }
   contributions["Payment Link Risk"] = linkContrib;
 
-  contributions["Device Change"] = metrics.deviceChangeFlag ? 12 : 0;
-  contributions["Night Transaction"] = metrics.isNightTransaction ? 8 : 0;
-  contributions["Account Age"] = metrics.accountAgeDays < 30 ? 10 : metrics.accountAgeDays < 90 ? 5 : 0;
-  contributions["Fraud History"] = metrics.historicalFraudExposureFlag ? 10 : 0;
+  // Device change
+  contributions["Device Change"] = metrics.deviceChangeFlag ? 13 : 0;
 
-  const amountFraudSignal = Math.min(metrics.amountDeviation / 15, 1) * 15;
+  // Night transaction
+  contributions["Night Transaction"] = metrics.isNightTransaction ? 9 : 0;
+
+  // Account age: tighter thresholds
+  contributions["Account Age"] =
+    metrics.accountAgeDays < 20  ? 14 :
+    metrics.accountAgeDays < 60  ? 9  :
+    metrics.accountAgeDays < 120 ? 4  : 0;
+
+  // Historical fraud: amplified by how much fraud (count) via a proxy of historicalFraudExposureFlag
+  // We use the flag; counts tracked in dataset but not surfaced in metrics — add a compounding factor
+  contributions["Fraud History"] = metrics.historicalFraudExposureFlag ? 14 : 0;
+
+  // Amount anomaly: sigmoid-shaped similar to ISO for consistency
+  const rawDev = metrics.amountDeviation;
+  const amountFraudSignal =
+    rawDev <= 2  ? 0 :
+    rawDev <= 6  ? (rawDev - 2) / 4 * 8 :
+    rawDev <= 15 ? 8 + (rawDev - 6) / 9 * 10 :
+    Math.min(18 + (rawDev - 15) / 20 * 6, 24);
   contributions["Amount Anomaly"] = Math.round(amountFraudSignal);
 
+  // Salary overrun: penalise crossing monthly salary
   const salaryRatio = metrics.salaryRatio ?? 0;
-  const salarySignal = salaryRatio > 1 ? Math.min((salaryRatio - 1) / 2, 1) * 12 : 0;
+  const salarySignal =
+    salaryRatio < 0.5 ? 0 :
+    salaryRatio < 1.0 ? (salaryRatio - 0.5) / 0.5 * 8 :
+    salaryRatio < 2.0 ? 8 + (salaryRatio - 1.0) * 6 :
+    Math.min(14 + (salaryRatio - 2.0) * 2, 20);
   contributions["Salary Overrun"] = Math.round(salarySignal);
 
-  // Behavioral drift contribution
-  const driftSignal = metrics.behavioralDriftScore > 40 ? Math.min((metrics.behavioralDriftScore - 40) / 60, 1) * 8 : 0;
+  // Behavioral drift
+  const driftSignal = metrics.behavioralDriftScore > 40
+    ? Math.min((metrics.behavioralDriftScore - 40) / 50, 1) * 10
+    : 0;
   contributions["Behavioral Drift"] = Math.round(driftSignal);
+
+  // Cross-feature interaction: new city + suspicious UPI together
+  const locationUpiInteraction =
+    (metrics.locationFlag && metrics.isFirstTimeBeneficiary && metrics.amountDeviation > 3) ? 8 : 0;
+  contributions["Location×Beneficiary"] = locationUpiInteraction;
+
+  // Geo-velocity: direct fraud signal
+  contributions["Geo-Velocity"] = metrics.geoVelocityFlag ? 15 : 0;
+
+  // Frequency spike in combination with small amounts = card testing
+  contributions["Rapid Probing"] = metrics.rapidSmallTransactionsFlag ? 10 : 0;
 
   const raw = Object.values(contributions).reduce((a, b) => a + b, 0);
   const score = Math.min(Math.round(raw), 100);
