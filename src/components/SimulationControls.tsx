@@ -4,10 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import { Beaker, ChevronDown } from "lucide-react";
-
-export type SimTransactionType = "normal" | "upi" | "payment_link";
 
 export interface SimulationFlags {
   highAmount: boolean;
@@ -20,8 +17,6 @@ export interface SimulationFlags {
 interface SimulationControlsProps {
   flags: SimulationFlags;
   onFlagsChange: (flags: SimulationFlags) => void;
-  simTxnType: SimTransactionType;
-  onSimTxnTypeChange: (type: SimTransactionType) => void;
 }
 
 const toggles: { key: keyof SimulationFlags; label: string; desc: string }[] = [
@@ -32,13 +27,7 @@ const toggles: { key: keyof SimulationFlags; label: string; desc: string }[] = [
   { key: "nightTransaction", label: "Night Transaction (2–5AM)", desc: "Unusual hours" },
 ];
 
-const simTxnTypeLabels: Record<SimTransactionType, string> = {
-  normal: "Standard Transaction",
-  upi: "UPI Transfer",
-  payment_link: "Payment Link Transaction",
-};
-
-const SimulationControls = ({ flags, onFlagsChange, simTxnType, onSimTxnTypeChange }: SimulationControlsProps) => {
+const SimulationControls = ({ flags, onFlagsChange }: SimulationControlsProps) => {
   const [open, setOpen] = useState(false);
   const activeCount = Object.values(flags).filter(Boolean).length;
 
@@ -61,24 +50,6 @@ const SimulationControls = ({ flags, onFlagsChange, simTxnType, onSimTxnTypeChan
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="space-y-4 pt-0">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-foreground">Generate Transaction Type</Label>
-              <div className="flex gap-2 flex-wrap">
-                {(["normal", "upi", "payment_link"] as SimTransactionType[]).map((t) => (
-                  <Button
-                    key={t}
-                    type="button"
-                    variant={simTxnType === t ? "default" : "outline"}
-                    size="sm"
-                    className="text-xs h-7"
-                    onClick={() => onSimTxnTypeChange(t)}
-                  >
-                    {simTxnTypeLabels[t]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
             <p className="text-[11px] text-muted-foreground">
               Toggle anomalies to inject into the next generated transaction.
             </p>

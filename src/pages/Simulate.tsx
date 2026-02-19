@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import SimulationControls, { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
+import SimulationControls, { SimulationFlags } from "@/components/SimulationControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, AlertCircle, Link2, Globe } from "lucide-react";
-import { AnalysisResult, RiskLevel } from "@/lib/types";
+import { Send, AlertCircle, Link2, Globe, Shield } from "lucide-react";
+import { AnalysisResult, RiskLevel, ScoringResult } from "@/lib/types";
 import { useDemo } from "@/lib/demo-context";
 import { userDataset, getUpiInfo } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import { analyzeTransaction, confirmTransaction } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useReviewedTransactionStore } from "@/lib/transaction-store";
-import { getRiskLevel } from "@/lib/scoring-engine";
+import GeoVelocityViz from "@/components/GeoVelocityViz";
 
 type TransactionType = "standard" | "upi" | "payment_link";
 
@@ -67,7 +67,7 @@ const Simulate = () => {
   const [upiId, setUpiId] = useState("");
   const [paymentLinkInput, setPaymentLinkInput] = useState("");
   const [category, setCategory] = useState("");
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResult] = useState<ScoringResult | null>(null);
   const [linkAnalysis, setLinkAnalysis] = useState<ReturnType<typeof analyzeLinkDomain>>(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -79,7 +79,6 @@ const Simulate = () => {
     paymentLink: false,
     nightTransaction: false,
   });
-  const [simTxnType, setSimTxnType] = useState<SimTransactionType>("normal");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +89,7 @@ const Simulate = () => {
     setLinkAnalysis(null);
 
     try {
-      let analysis: AnalysisResult;
+      let analysis: ScoringResult;
       const linkInfo = txnType === "payment_link" && paymentLinkInput ? analyzeLinkDomain(paymentLinkInput) : null;
       if (txnType === "payment_link") setLinkAnalysis(linkInfo);
 
@@ -102,16 +101,30 @@ const Simulate = () => {
         const effectiveLink = txnType === "payment_link" ? paymentLinkInput : undefined;
         analysis = scoreTransaction(`sim-${Date.now()}`, parseFloat(amount), city, effectiveUpiId, upiInfo, user, 0, effectiveLink);
       } else {
-        analysis = await analyzeTransaction({
+        const apiResult = await analyzeTransaction({
           userId: "IND-001",
           amount: parseFloat(amount),
           location: city,
           timestamp: new Date().toISOString(),
         });
+        // Wrap API result as ScoringResult with defaults
+        analysis = {
+          ...apiResult,
+          anomalyScore: 0,
+          fraudProbability: 0,
+          confidenceScore: 50,
+          metrics: {
+            amountDeviation: 0, monthlySpendRatio: 0, locationFlag: false, frequencySpike: false,
+            isFirstTimeBeneficiary: false, upiAgeDays: 0, upiAgeFlag: false, isPaymentLink: false,
+            linkRisk: "none", isNightTransaction: false, deviceChangeFlag: false,
+            rapidSmallTransactionsFlag: false, geoVelocityFlag: false, beneficiaryRiskScore: 0,
+            accountAgeDays: 0, transactionTimeRisk: 0, historicalFraudExposureFlag: false,
+            salaryRatio: 0, behavioralDriftScore: 0, linkRiskScore: 0,
+          },
+        };
       }
 
       setResult(analysis);
-      // Immediately save to ReviewedTransactionStore with "Analyzed" status
       const txnEntry = {
         id: analysis.transactionId,
         date: new Date().toISOString(),
@@ -122,7 +135,6 @@ const Simulate = () => {
         status: "Analyzed" as const,
       };
       addReviewedTransaction(txnEntry);
-      console.log("[ReviewedStore] Transaction added after Analyze:", txnEntry);
       if (analysis.action === "CONFIRMATION_REQUIRED") {
         setTimeout(() => setShowModal(true), 1500);
       }
@@ -167,8 +179,6 @@ const Simulate = () => {
         <SimulationControls
           flags={simFlags}
           onFlagsChange={setSimFlags}
-          simTxnType={simTxnType}
-          onSimTxnTypeChange={setSimTxnType}
         />
 
         {/* Analyze Transaction */}
@@ -288,7 +298,15 @@ const Simulate = () => {
           <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
             <CardContent className="p-6 space-y-6">
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
-                <RiskGauge score={result.riskScore} />
+                <div className="flex flex-col items-center gap-2">
+                  <RiskGauge score={result.riskScore} />
+                  {result.confidenceScore !== undefined && (
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary border-primary/30">
+                      <Shield className="h-3 w-3 mr-1" />
+                      {result.confidenceScore}% confidence
+                    </Badge>
+                  )}
+                </div>
                 <div className="text-center sm:text-left space-y-2">
                   <Badge variant="outline" className={`text-sm px-3 py-1 ${riskBadgeStyle(result.riskLevel)}`}>
                     {riskLabels[result.riskLevel]}
@@ -310,6 +328,42 @@ const Simulate = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Geo-Velocity Visualization */}
+              {result.metrics?.geoVelocityFlag && result.metrics?.previousCity && (
+                <GeoVelocityViz
+                  previousCity={result.metrics.previousCity}
+                  currentCity={city}
+                  timeDiffMinutes={Math.floor(Math.random() * 45) + 10}
+                />
+              )}
+
+              {/* Payment Link Deep Inspection */}
+              {result.metrics?.linkDeepInspection && (
+                <Card className="bg-secondary/30 border-border/50">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Link2 className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Link Deep Inspection</span>
+                    </div>
+                    {[
+                      { label: "Domain", value: result.metrics.linkDeepInspection.domain },
+                      { label: "Shortened URL", value: result.metrics.linkDeepInspection.isShortened ? "YES" : "NO", flag: result.metrics.linkDeepInspection.isShortened },
+                      { label: "Suspicious Keywords", value: result.metrics.linkDeepInspection.hasSuspiciousKeywords ? "DETECTED" : "NONE", flag: result.metrics.linkDeepInspection.hasSuspiciousKeywords },
+                      { label: "Lookalike Match", value: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.5 ? `${Math.round(result.metrics.linkDeepInspection.lookalikeSimilarity * 100)}% → ${result.metrics.linkDeepInspection.lookalikeDomain}` : "NONE", flag: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.7 },
+                      { label: "Domain Age (sim)", value: `${result.metrics.linkDeepInspection.domainAgeSimDays}d`, flag: result.metrics.linkDeepInspection.domainAgeSimDays < 30 },
+                      { label: "Link Risk Score", value: `${result.metrics.linkDeepInspection.linkRiskScore}/30`, flag: result.metrics.linkDeepInspection.linkRiskScore > 10 },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                          {item.value}
+                        </Badge>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
               {result.reasons.length > 0 && (
                 <div className="rounded-xl bg-secondary/50 p-4 space-y-2">

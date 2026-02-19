@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, Link2, UserX, Clock } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, Link2, UserX, Clock, Shield, TrendingUp } from "lucide-react";
 import { RiskLevel, ScoringResult, LiveTransaction } from "@/lib/types";
 import { generateDatasetTransaction, getUserProfile, SimulationInjection } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import GeoVelocityViz from "@/components/GeoVelocityViz";
 import { useToast } from "@/hooks/use-toast";
-import { SimTransactionType } from "@/components/SimulationControls";
 import { useLiveTransactionStore, useReviewedTransactionStore } from "@/lib/transaction-store";
 
 const riskBadgeStyle = (level: RiskLevel) => {
@@ -22,18 +22,11 @@ const riskBadgeStyle = (level: RiskLevel) => {
 
 const riskLabels: Record<RiskLevel, string> = { SAFE: "Safe", WARNING: "Warning", HIGH_RISK: "High Risk" };
 
-const txnTypeLabels: Record<string, string> = {
-  standard: "Standard",
-  upi: "UPI",
-  payment_link: "Pay Link",
-};
-
 function generateScoredTransaction(
   recentCountMap: Map<string, number>,
-  injection?: SimulationInjection,
-  txnType?: SimTransactionType
+  injection?: SimulationInjection
 ): LiveTransaction & { _scoring?: ScoringResult; _txnType?: string } {
-  const raw = generateDatasetTransaction(injection, txnType);
+  const raw = generateDatasetTransaction(injection);
   const user = raw._userRef;
   const recentCount = recentCountMap.get(user.userId) || 0;
 
@@ -44,6 +37,7 @@ function generateScoredTransaction(
 
   recentCountMap.set(user.userId, recentCount + 1);
 
+  // Auto-determine transaction type
   let displayType = "standard";
   if (raw.paymentLink) displayType = "payment_link";
   else if (raw.upiId && !["bigbasket@razorpay", "swiggy@paytm", "flipkart@axl", "irctc@sbi", "apollo247@hdfcbank", "electricity.tneb@paytm", "zomato@ybl"].every(id => id !== raw.upiId)) displayType = "upi";
@@ -65,6 +59,12 @@ function generateScoredTransaction(
   };
 }
 
+const txnTypeLabels: Record<string, string> = {
+  standard: "Standard",
+  upi: "UPI",
+  payment_link: "Pay Link",
+};
+
 const LiveTransactionStream = () => {
   const [transactions, setTransactions] = useState<(LiveTransaction & { _scoring?: ScoringResult; _txnType?: string })[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -74,21 +74,19 @@ const LiveTransactionStream = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const frequencyMap = useRef(new Map<string, number>());
   const { toast } = useToast();
-  const { addLiveTransaction, updateLiveStatus } = useLiveTransactionStore();
+  const { updateLiveStatus } = useLiveTransactionStore();
   const { addReviewedTransaction } = useReviewedTransactionStore();
 
   useEffect(() => {
-    const types: SimTransactionType[] = ["normal", "upi", "payment_link"];
-    const seed = Array.from({ length: 3 }, (_, i) =>
-      generateScoredTransaction(frequencyMap.current, undefined, types[i % 3])
+    const seed = Array.from({ length: 3 }, () =>
+      generateScoredTransaction(frequencyMap.current)
     );
     setTransactions(seed);
   }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const effectiveType = (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
-      const newTxn = generateScoredTransaction(frequencyMap.current, undefined, effectiveType);
+      const newTxn = generateScoredTransaction(frequencyMap.current);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
@@ -135,7 +133,6 @@ const LiveTransactionStream = () => {
       )
     );
     updateLiveStatus(selectedTxnId, newStatus);
-    // Push to reviewed store when user explicitly confirms/reports
     const txn = transactions.find((t) => t.id === selectedTxnId);
     if (txn) {
       addReviewedTransaction({
@@ -232,7 +229,7 @@ const LiveTransactionStream = () => {
                   transition={{ duration: 0.3, ease: "easeOut" }}
                   className="space-y-4"
                 >
-                  {/* Final Score */}
+                  {/* Final Score + Confidence */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Final Risk Score</span>
@@ -246,9 +243,17 @@ const LiveTransactionStream = () => {
                         {selectedDetail.riskScore}
                       </motion.span>
                     </div>
-                    <Badge variant="outline" className={`${riskBadgeStyle(selectedDetail.riskLevel)}`}>
-                      {riskLabels[selectedDetail.riskLevel]}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`${riskBadgeStyle(selectedDetail.riskLevel)}`}>
+                        {riskLabels[selectedDetail.riskLevel]}
+                      </Badge>
+                      {selectedDetail._scoring.confidenceScore !== undefined && (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-primary/10 text-primary border-primary/30">
+                          <Shield className="h-2.5 w-2.5 mr-0.5" />
+                          {selectedDetail._scoring.confidenceScore}% confidence
+                        </Badge>
+                      )}
+                    </div>
 
                     <div className="rounded-lg bg-secondary/50 p-2 space-y-1">
                       <div className="flex items-center justify-between text-[11px]">
@@ -275,6 +280,7 @@ const LiveTransactionStream = () => {
                         { label: "Monthly Spend Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
                         { label: "Frequency Spike", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
                         { label: "Night Transaction", flag: selectedDetail._scoring.metrics.isNightTransaction, value: selectedDetail._scoring.metrics.isNightTransaction ? "2AM–5AM" : "OK" },
+                        { label: "Behavioral Drift", flag: selectedDetail._scoring.metrics.behavioralDriftScore > 40, value: `${selectedDetail._scoring.metrics.behavioralDriftScore}%` },
                       ].map((rule, i) => (
                         <motion.div
                           key={rule.label}
@@ -327,6 +333,7 @@ const LiveTransactionStream = () => {
                         { label: "Geo-Velocity", flag: selectedDetail._scoring.metrics.geoVelocityFlag, value: selectedDetail._scoring.metrics.geoVelocityFlag ? "FLAGGED" : "OK" },
                         { label: "Account Age", flag: selectedDetail._scoring.metrics.accountAgeDays < 90, value: `${selectedDetail._scoring.metrics.accountAgeDays}d` },
                         { label: "Fraud History", flag: selectedDetail._scoring.metrics.historicalFraudExposureFlag, value: selectedDetail._scoring.metrics.historicalFraudExposureFlag ? "YES" : "NO" },
+                        { label: "Link Risk Score", flag: selectedDetail._scoring.metrics.linkRiskScore > 10, value: `${selectedDetail._scoring.metrics.linkRiskScore}/30` },
                       ].map((item, i) => (
                         <motion.div
                           key={item.label}
@@ -343,6 +350,59 @@ const LiveTransactionStream = () => {
                       ))}
                     </div>
                   </div>
+
+                  {/* Geo-Velocity Visualization */}
+                  {selectedDetail._scoring.metrics.geoVelocityFlag && selectedDetail._scoring.metrics.previousCity && (
+                    <GeoVelocityViz
+                      previousCity={selectedDetail._scoring.metrics.previousCity}
+                      currentCity={selectedDetail.location}
+                      timeDiffMinutes={Math.floor(Math.random() * 45) + 10}
+                    />
+                  )}
+
+                  {/* Payment Link Deep Inspection */}
+                  {selectedDetail._scoring.metrics.linkDeepInspection && (
+                    <div className="space-y-1.5 pt-2 border-t border-border/50">
+                      <div className="flex items-center gap-1">
+                        <Link2 className="h-3 w-3 text-primary" />
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Link Deep Inspection</p>
+                      </div>
+                      {[
+                        { label: "Domain", value: selectedDetail._scoring.metrics.linkDeepInspection.domain },
+                        { label: "Shortened URL", value: selectedDetail._scoring.metrics.linkDeepInspection.isShortened ? "YES" : "NO", flag: selectedDetail._scoring.metrics.linkDeepInspection.isShortened },
+                        { label: "Suspicious Keywords", value: selectedDetail._scoring.metrics.linkDeepInspection.hasSuspiciousKeywords ? "DETECTED" : "NONE", flag: selectedDetail._scoring.metrics.linkDeepInspection.hasSuspiciousKeywords },
+                        { label: "Lookalike Match", value: selectedDetail._scoring.metrics.linkDeepInspection.lookalikeSimilarity > 0.5 ? `${Math.round(selectedDetail._scoring.metrics.linkDeepInspection.lookalikeSimilarity * 100)}% → ${selectedDetail._scoring.metrics.linkDeepInspection.lookalikeDomain}` : "NONE", flag: selectedDetail._scoring.metrics.linkDeepInspection.lookalikeSimilarity > 0.7 },
+                        { label: "Domain Age (sim)", value: `${selectedDetail._scoring.metrics.linkDeepInspection.domainAgeSimDays}d`, flag: selectedDetail._scoring.metrics.linkDeepInspection.domainAgeSimDays < 30 },
+                        { label: "Link Risk Score", value: `${selectedDetail._scoring.metrics.linkDeepInspection.linkRiskScore}/30`, flag: selectedDetail._scoring.metrics.linkDeepInspection.linkRiskScore > 10 },
+                      ].map((item, i) => (
+                        <motion.div
+                          key={item.label}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.3 + i * 0.04, duration: 0.25 }}
+                          className="flex items-center justify-between text-[11px]"
+                        >
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                            {item.value}
+                          </Badge>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Behavioral Drift Alert */}
+                  {selectedDetail._scoring.metrics.behavioralDriftScore > 40 && (
+                    <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <TrendingUp className="h-3.5 w-3.5 text-warning" />
+                        <span className="text-[11px] font-semibold text-warning">Behavioral Drift Detected</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        14-day spending average deviates {selectedDetail._scoring.metrics.behavioralDriftScore}% from 90-day baseline.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Explainable Reasons */}
                   {selectedDetail._scoring.reasons.length > 0 && (
