@@ -1,13 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, XCircle, UserX } from "lucide-react";
 import { AnalysisResult } from "@/lib/types";
+import { ReceiverApiResponse } from "@/lib/api";
 
 interface ConfirmationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  result: AnalysisResult;
+  result: AnalysisResult & ReceiverApiResponse;
   onConfirm: (response: "legit" | "fraud") => void;
 }
 
@@ -44,6 +45,45 @@ const ConfirmationModal = ({ open, onOpenChange, result, onConfirm }: Confirmati
               ))}
             </ul>
           </div>
+
+          {/* ── Receiver Risk (appended, non-breaking) ─────────────────────── */}
+          {(result.receiver_risk !== undefined || (result.receiver_reasons && result.receiver_reasons.length > 0)) && (
+            <div className="rounded-xl bg-danger/5 border border-danger/20 p-4 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <UserX className="h-3.5 w-3.5 text-danger" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Receiver Intelligence</p>
+                {result.receiver_risk !== undefined && (
+                  <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0 bg-danger/15 text-danger border-danger/30">
+                    Receiver Risk: {result.receiver_risk}
+                  </Badge>
+                )}
+              </div>
+              {result.receiver_reasons && result.receiver_reasons.length > 0 && (
+                <ul className="space-y-1.5">
+                  {result.receiver_reasons.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-foreground">
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-danger shrink-0" />
+                      {reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {result.transaction_id_flag && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-danger/15 text-danger border-danger/30">TXN ID Spoofing</Badge>
+                )}
+                {result.receiver_account_age_flag && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-warning/15 text-warning border-warning/30">New Account</Badge>
+                )}
+                {result.merchant_flag && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-warning/15 text-warning border-warning/30">Unverified Merchant</Badge>
+                )}
+                {result.beneficiary_flag && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-warning/15 text-warning border-warning/30">New Beneficiary</Badge>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <Button
