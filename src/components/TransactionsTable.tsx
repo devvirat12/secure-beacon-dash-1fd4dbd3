@@ -29,7 +29,7 @@ const TransactionsTable = () => {
   const { reviewedTransactions } = useReviewedTransactionStore();
   const [filter, setFilter] = useState<"all" | RiskLevel>("all");
 
-  console.log("[TransactionsTable] reviewedTransactions:", reviewedTransactions.length, reviewedTransactions);
+  
 
   const filtered = filter === "all" ? reviewedTransactions : reviewedTransactions.filter((t) => t.riskLevel === filter);
 
