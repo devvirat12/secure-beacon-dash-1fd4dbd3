@@ -44,7 +44,7 @@ const SimulationControls = ({ flags, onFlagsChange, simTxnType, onSimTxnTypeChan
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <Card className="rounded-2xl shadow-sm border-border/50">
+      <Card className="glass-card rounded-2xl">
         <CardHeader className="pb-2">
           <CollapsibleTrigger className="w-full cursor-pointer">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -84,7 +84,7 @@ const SimulationControls = ({ flags, onFlagsChange, simTxnType, onSimTxnTypeChan
             </p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {toggles.map((t) => (
-                <div key={t.key} className="flex items-center justify-between gap-3 rounded-lg bg-muted p-3">
+                <div key={t.key} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/50 p-3">
                   <div className="min-w-0">
                     <Label className="text-xs font-medium text-foreground">{t.label}</Label>
                     <p className="text-[10px] text-muted-foreground">{t.desc}</p>

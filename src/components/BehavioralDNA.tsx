@@ -18,7 +18,7 @@ const BehavioralDNA = ({ user, riskTrend }: BehavioralDNAProps) => {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card className="rounded-2xl shadow-sm border-border/50">
+      <Card className="glass-card rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Brain className="h-4 w-4 text-primary" />
@@ -38,7 +38,7 @@ const BehavioralDNA = ({ user, riskTrend }: BehavioralDNAProps) => {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl shadow-sm border-border/50">
+      <Card className="glass-card rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-foreground">Risk Trend</CardTitle>
         </CardHeader>

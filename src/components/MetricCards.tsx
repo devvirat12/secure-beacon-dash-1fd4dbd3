@@ -18,7 +18,7 @@ const MetricCards = ({ user }: MetricCardsProps) => {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {metrics.map((m) => (
-        <Card key={m.label} className="rounded-2xl shadow-sm border-border/50">
+        <Card key={m.label} className="glass-card rounded-2xl">
           <CardContent className="flex items-start gap-3 p-4">
             <div className={`mt-0.5 ${m.color}`}>
               <m.icon className="h-4 w-4" />

@@ -14,7 +14,7 @@ interface ConfirmationModalProps {
 const ConfirmationModal = ({ open, onOpenChange, result, onConfirm }: ConfirmationModalProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-2xl sm:max-w-md">
+      <DialogContent className="rounded-2xl sm:max-w-md glass-card border-border/50">
         <DialogHeader>
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15">
             <AlertTriangle className="h-6 w-6 text-warning" />
@@ -33,7 +33,7 @@ const ConfirmationModal = ({ open, onOpenChange, result, onConfirm }: Confirmati
             </Badge>
           </div>
 
-          <div className="rounded-xl bg-muted p-4 space-y-2">
+          <div className="rounded-xl bg-secondary/50 p-4 space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reasons</p>
             <ul className="space-y-1.5">
               {result.reasons.map((reason, i) => (
