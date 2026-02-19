@@ -17,7 +17,7 @@ import { userDataset, getUpiInfo } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import { analyzeTransaction, confirmTransaction } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { useTransactionStore } from "@/lib/transaction-store";
+import { useReviewedTransactionStore } from "@/lib/transaction-store";
 import { getRiskLevel } from "@/lib/scoring-engine";
 
 type TransactionType = "standard" | "upi" | "payment_link";
@@ -60,7 +60,7 @@ const riskBadgeStyle = (level: RiskLevel) => {
 const Simulate = () => {
   const { demoMode } = useDemo();
   const { toast } = useToast();
-  const { addTransaction, updateStatus } = useTransactionStore();
+  const { addReviewedTransaction, updateReviewedStatus } = useReviewedTransactionStore();
   const [txnType, setTxnType] = useState<TransactionType>("standard");
   const [amount, setAmount] = useState("");
   const [city, setCity] = useState("");
@@ -112,7 +112,7 @@ const Simulate = () => {
 
       setResult(analysis);
       // Push to shared store
-      addTransaction({
+      addReviewedTransaction({
         id: analysis.transactionId,
         date: new Date().toISOString(),
         amount: parseFloat(amount),
@@ -138,7 +138,7 @@ const Simulate = () => {
       if (!demoMode) {
         await confirmTransaction({ transactionId: result.transactionId, userResponse: response });
       }
-      updateStatus(result.transactionId, newStatus);
+      updateReviewedStatus(result.transactionId, newStatus);
       toast({
         title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
         description: response === "legit" ? "Behavioral profile updated." : "This transaction has been reported as fraud.",

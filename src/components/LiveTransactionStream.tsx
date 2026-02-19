@@ -9,7 +9,7 @@ import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
 import { SimTransactionType } from "@/components/SimulationControls";
-import { useTransactionStore } from "@/lib/transaction-store";
+import { useLiveTransactionStore, useReviewedTransactionStore } from "@/lib/transaction-store";
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -74,7 +74,8 @@ const LiveTransactionStream = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const frequencyMap = useRef(new Map<string, number>());
   const { toast } = useToast();
-  const { addTransaction, updateStatus } = useTransactionStore();
+  const { addLiveTransaction, updateLiveStatus } = useLiveTransactionStore();
+  const { addReviewedTransaction } = useReviewedTransactionStore();
 
   useEffect(() => {
     const types: SimTransactionType[] = ["normal", "upi", "payment_link"];
@@ -82,18 +83,16 @@ const LiveTransactionStream = () => {
       generateScoredTransaction(frequencyMap.current, undefined, types[i % 3])
     );
     setTransactions(seed);
-    seed.forEach((t) => addTransaction({ id: t.id, date: t.date, amount: t.amount, location: t.location, riskScore: t.riskScore, riskLevel: t.riskLevel, status: t.status }));
-  }, [addTransaction]);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const effectiveType = (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
       const newTxn = generateScoredTransaction(frequencyMap.current, undefined, effectiveType);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
-      addTransaction({ id: newTxn.id, date: newTxn.date, amount: newTxn.amount, location: newTxn.location, riskScore: newTxn.riskScore, riskLevel: newTxn.riskLevel, status: newTxn.status });
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
-  }, [addTransaction]);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -135,7 +134,15 @@ const LiveTransactionStream = () => {
         t.id === selectedTxnId ? { ...t, status: newStatus } : t
       )
     );
-    updateStatus(selectedTxnId, newStatus);
+    updateLiveStatus(selectedTxnId, newStatus);
+    // Push to reviewed store when user explicitly confirms/reports
+    const txn = transactions.find((t) => t.id === selectedTxnId);
+    if (txn) {
+      addReviewedTransaction({
+        id: txn.id, date: txn.date, amount: txn.amount, location: txn.location,
+        riskScore: txn.riskScore, riskLevel: txn.riskLevel, status: newStatus,
+      });
+    }
     toast({
       title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
       description: response === "legit" ? "Behavioral profile updated." : "Transaction reported as fraud.",

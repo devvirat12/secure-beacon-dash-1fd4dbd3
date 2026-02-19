@@ -1,36 +1,83 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { Transaction, RiskLevel } from "@/lib/types";
+import { Transaction } from "@/lib/types";
 
-interface TransactionStore {
-  transactions: Transaction[];
-  addTransaction: (txn: Transaction) => void;
-  updateStatus: (id: string, status: Transaction["status"]) => void;
+/**
+ * LiveTransactionStore — holds auto-generated stream transactions (monitoring feed).
+ * These are NOT shown in Recent Transactions.
+ */
+interface LiveTransactionStore {
+  liveTransactions: (Transaction & { _scoring?: any; _txnType?: string })[];
+  addLiveTransaction: (txn: Transaction & { _scoring?: any; _txnType?: string }) => void;
+  updateLiveStatus: (id: string, status: Transaction["status"]) => void;
 }
 
-const TransactionStoreContext = createContext<TransactionStore | null>(null);
+const LiveTransactionStoreContext = createContext<LiveTransactionStore | null>(null);
 
-export function TransactionStoreProvider({ children }: { children: ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+export function LiveTransactionStoreProvider({ children }: { children: ReactNode }) {
+  const [liveTransactions, setLiveTransactions] = useState<(Transaction & { _scoring?: any; _txnType?: string })[]>([]);
 
-  const addTransaction = useCallback((txn: Transaction) => {
-    setTransactions((prev) => [txn, ...prev].slice(0, 100));
+  const addLiveTransaction = useCallback((txn: Transaction & { _scoring?: any; _txnType?: string }) => {
+    setLiveTransactions((prev) => [txn, ...prev].slice(0, 50));
   }, []);
 
-  const updateStatus = useCallback((id: string, status: Transaction["status"]) => {
-    setTransactions((prev) =>
+  const updateLiveStatus = useCallback((id: string, status: Transaction["status"]) => {
+    setLiveTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, status } : t))
     );
   }, []);
 
   return (
-    <TransactionStoreContext.Provider value={{ transactions, addTransaction, updateStatus }}>
+    <LiveTransactionStoreContext.Provider value={{ liveTransactions, addLiveTransaction, updateLiveStatus }}>
       {children}
-    </TransactionStoreContext.Provider>
+    </LiveTransactionStoreContext.Provider>
   );
 }
 
-export function useTransactionStore() {
-  const ctx = useContext(TransactionStoreContext);
-  if (!ctx) throw new Error("useTransactionStore must be used within TransactionStoreProvider");
+export function useLiveTransactionStore() {
+  const ctx = useContext(LiveTransactionStoreContext);
+  if (!ctx) throw new Error("useLiveTransactionStore must be used within LiveTransactionStoreProvider");
+  return ctx;
+}
+
+/**
+ * ReviewedTransactionStore — holds only user-reviewed transactions:
+ * - Manually analyzed via Simulate
+ * - Confirmed Legit / Reported Fraud from live stream
+ */
+interface ReviewedTransactionStore {
+  reviewedTransactions: Transaction[];
+  addReviewedTransaction: (txn: Transaction) => void;
+  updateReviewedStatus: (id: string, status: Transaction["status"]) => void;
+}
+
+const ReviewedTransactionStoreContext = createContext<ReviewedTransactionStore | null>(null);
+
+export function ReviewedTransactionStoreProvider({ children }: { children: ReactNode }) {
+  const [reviewedTransactions, setReviewedTransactions] = useState<Transaction[]>([]);
+
+  const addReviewedTransaction = useCallback((txn: Transaction) => {
+    setReviewedTransactions((prev) => {
+      // Avoid duplicates
+      if (prev.some((t) => t.id === txn.id)) return prev;
+      return [txn, ...prev].slice(0, 100);
+    });
+  }, []);
+
+  const updateReviewedStatus = useCallback((id: string, status: Transaction["status"]) => {
+    setReviewedTransactions((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status } : t))
+    );
+  }, []);
+
+  return (
+    <ReviewedTransactionStoreContext.Provider value={{ reviewedTransactions, addReviewedTransaction, updateReviewedStatus }}>
+      {children}
+    </ReviewedTransactionStoreContext.Provider>
+  );
+}
+
+export function useReviewedTransactionStore() {
+  const ctx = useContext(ReviewedTransactionStoreContext);
+  if (!ctx) throw new Error("useReviewedTransactionStore must be used within ReviewedTransactionStoreProvider");
   return ctx;
 }
