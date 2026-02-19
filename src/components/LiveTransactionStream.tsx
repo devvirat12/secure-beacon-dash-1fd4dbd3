@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, Link2, UserX, Clock } from "lucide-react";
@@ -8,6 +9,7 @@ import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
 import { SimTransactionType } from "@/components/SimulationControls";
+import { useTransactionStore } from "@/lib/transaction-store";
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -72,6 +74,7 @@ const LiveTransactionStream = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const frequencyMap = useRef(new Map<string, number>());
   const { toast } = useToast();
+  const { addTransaction, updateStatus } = useTransactionStore();
 
   useEffect(() => {
     const types: SimTransactionType[] = ["normal", "upi", "payment_link"];
@@ -79,16 +82,18 @@ const LiveTransactionStream = () => {
       generateScoredTransaction(frequencyMap.current, undefined, types[i % 3])
     );
     setTransactions(seed);
-  }, []);
+    seed.forEach((t) => addTransaction({ id: t.id, date: t.date, amount: t.amount, location: t.location, riskScore: t.riskScore, riskLevel: t.riskLevel, status: t.status }));
+  }, [addTransaction]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const effectiveType = (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
       const newTxn = generateScoredTransaction(frequencyMap.current, undefined, effectiveType);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
+      addTransaction({ id: newTxn.id, date: newTxn.date, amount: newTxn.amount, location: newTxn.location, riskScore: newTxn.riskScore, riskLevel: newTxn.riskLevel, status: newTxn.status });
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [addTransaction]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -124,13 +129,13 @@ const LiveTransactionStream = () => {
       }
     }
 
+    const newStatus = response === "legit" ? "Confirmed Legit" as const : "Fraud" as const;
     setTransactions((prev) =>
       prev.map((t) =>
-        t.id === selectedTxnId
-          ? { ...t, status: response === "legit" ? "Confirmed Legit" as const : "Fraud" as const }
-          : t
+        t.id === selectedTxnId ? { ...t, status: newStatus } : t
       )
     );
+    updateStatus(selectedTxnId, newStatus);
     toast({
       title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
       description: response === "legit" ? "Behavioral profile updated." : "Transaction reported as fraud.",
@@ -154,12 +159,16 @@ const LiveTransactionStream = () => {
           </CardHeader>
           <CardContent className="p-0">
             <div ref={scrollRef} className="max-h-[400px] overflow-y-auto">
-              <div className="divide-y divide-border/50">
+              <AnimatePresence initial={false}>
                 {transactions.map((txn) => (
-                  <div
+                  <motion.div
                     key={txn.id}
+                    initial={{ opacity: 0, y: -20, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
                     onClick={() => handleRowClick(txn)}
-                    className={`flex items-center gap-4 px-6 py-3 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300 ${
+                    className={`flex items-center gap-4 px-6 py-3 transition-colors border-b border-border/50 ${
                       txn.status === "Fraud" ? "bg-danger/5" : ""
                     } ${selectedDetail?.id === txn.id ? "bg-primary/5" : ""} cursor-pointer hover:bg-secondary/30`}
                   >
@@ -189,9 +198,9 @@ const LiveTransactionStream = () => {
                         {riskLabels[txn.riskLevel]}
                       </Badge>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </AnimatePresence>
             </div>
           </CardContent>
         </Card>
@@ -206,128 +215,169 @@ const LiveTransactionStream = () => {
             <p className="text-[10px] text-muted-foreground mt-0.5">Flagging Only — No Auto Blocking</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {selectedDetail?._scoring ? (
-              <>
-                {/* Final Score */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Final Risk Score</span>
-                    <span className={`text-2xl font-bold ${selectedDetail.riskScore >= 70 ? "text-danger" : selectedDetail.riskScore >= 50 ? "text-warning" : "text-safe"}`}>
-                      {selectedDetail.riskScore}
-                    </span>
-                  </div>
-                  <Badge variant="outline" className={`${riskBadgeStyle(selectedDetail.riskLevel)}`}>
-                    {riskLabels[selectedDetail.riskLevel]}
-                  </Badge>
-
-                  <div className="rounded-lg bg-secondary/50 p-2 space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Rule Score</span>
-                      <span className="font-semibold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
+            <AnimatePresence mode="wait">
+              {selectedDetail?._scoring ? (
+                <motion.div
+                  key={selectedDetail.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="space-y-4"
+                >
+                  {/* Final Score */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Final Risk Score</span>
+                      <motion.span
+                        key={selectedDetail.riskScore}
+                        initial={{ scale: 1.3, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        className={`text-2xl font-bold ${selectedDetail.riskScore >= 70 ? "text-danger" : selectedDetail.riskScore >= 50 ? "text-warning" : "text-safe"}`}
+                      >
+                        {selectedDetail.riskScore}
+                      </motion.span>
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">ML Score</span>
-                      <span className="font-semibold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
-                    </div>
-                  </div>
-                </div>
+                    <Badge variant="outline" className={`${riskBadgeStyle(selectedDetail.riskLevel)}`}>
+                      {riskLabels[selectedDetail.riskLevel]}
+                    </Badge>
 
-                {/* A. Rule-Based Engine */}
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">A. Rule-Based Engine</p>
-                    <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {[
-                      { label: "Amount Deviation", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
-                      { label: "City Anomaly", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
-                      { label: "Monthly Spend Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
-                      { label: "Frequency Spike", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
-                      { label: "Night Transaction", flag: selectedDetail._scoring.metrics.isNightTransaction, value: selectedDetail._scoring.metrics.isNightTransaction ? "2AM–5AM" : "OK" },
-                    ].map((rule) => (
-                      <div key={rule.label} className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{rule.label}</span>
-                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${rule.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                          {rule.value}
-                        </Badge>
+                    <div className="rounded-lg bg-secondary/50 p-2 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Rule Score</span>
+                        <span className="font-semibold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* B. ML Anomaly Engine */}
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Engine (Hybrid)</p>
-                    <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
-                  </div>
-
-                  {/* Model breakdown */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">Isolation Forest (Anomaly)</span>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">ML Score</span>
+                        <span className="font-semibold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
                       </div>
-                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.anomalyScore || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                        {selectedDetail._scoring.anomalyScore || 0}/100
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-1">
-                        <UserX className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">LightGBM (Fraud Prob.)</span>
-                      </div>
-                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.fraudProbability || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                        {selectedDetail._scoring.fraudProbability || 0}/100
-                      </Badge>
                     </div>
                   </div>
 
-                  {/* Enhanced feature flags */}
-                  <div className="space-y-1">
-                    {[
-                      { label: "Beneficiary Risk", flag: selectedDetail._scoring.metrics.beneficiaryRiskScore > 30, value: `${selectedDetail._scoring.metrics.beneficiaryRiskScore}/100` },
-                      { label: "Device Change", flag: selectedDetail._scoring.metrics.deviceChangeFlag, value: selectedDetail._scoring.metrics.deviceChangeFlag ? "FLAGGED" : "OK" },
-                      { label: "Geo-Velocity", flag: selectedDetail._scoring.metrics.geoVelocityFlag, value: selectedDetail._scoring.metrics.geoVelocityFlag ? "FLAGGED" : "OK" },
-                      { label: "Account Age", flag: selectedDetail._scoring.metrics.accountAgeDays < 90, value: `${selectedDetail._scoring.metrics.accountAgeDays}d` },
-                      { label: "Fraud History", flag: selectedDetail._scoring.metrics.historicalFraudExposureFlag, value: selectedDetail._scoring.metrics.historicalFraudExposureFlag ? "YES" : "NO" },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{item.label}</span>
-                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                          {item.value}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Explainable Reasons */}
-                {selectedDetail._scoring.reasons.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-border/50">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
-                    {selectedDetail.riskScore >= 50 && (
-                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>
-                    )}
-                    <ul className="space-y-1">
-                      {selectedDetail._scoring.reasons.map((r, i) => (
-                        <li key={i} className="flex items-start gap-1.5 text-[11px] text-foreground">
-                          <span className="mt-1 h-1 w-1 rounded-full bg-primary shrink-0" />
-                          {r}
-                        </li>
+                  {/* A. Rule-Based Engine */}
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">A. Rule-Based Engine</p>
+                      <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {[
+                        { label: "Amount Deviation", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
+                        { label: "City Anomaly", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
+                        { label: "Monthly Spend Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
+                        { label: "Frequency Spike", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
+                        { label: "Night Transaction", flag: selectedDetail._scoring.metrics.isNightTransaction, value: selectedDetail._scoring.metrics.isNightTransaction ? "2AM–5AM" : "OK" },
+                      ].map((rule, i) => (
+                        <motion.div
+                          key={rule.label}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04, duration: 0.25 }}
+                          className="flex items-center justify-between text-[11px]"
+                        >
+                          <span className="text-muted-foreground">{rule.label}</span>
+                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${rule.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                            {rule.value}
+                          </Badge>
+                        </motion.div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <BarChart3 className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Click a transaction to view<br />dataset-driven risk analysis</p>
-              </div>
-            )}
+
+                  {/* B. ML Anomaly Engine */}
+                  <div className="space-y-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Engine (Hybrid)</p>
+                      <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">Isolation Forest (Anomaly)</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.anomalyScore || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                          {selectedDetail._scoring.anomalyScore || 0}/100
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1">
+                          <UserX className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">LightGBM (Fraud Prob.)</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.fraudProbability || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                          {selectedDetail._scoring.fraudProbability || 0}/100
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {[
+                        { label: "Beneficiary Risk", flag: selectedDetail._scoring.metrics.beneficiaryRiskScore > 30, value: `${selectedDetail._scoring.metrics.beneficiaryRiskScore}/100` },
+                        { label: "Device Change", flag: selectedDetail._scoring.metrics.deviceChangeFlag, value: selectedDetail._scoring.metrics.deviceChangeFlag ? "FLAGGED" : "OK" },
+                        { label: "Geo-Velocity", flag: selectedDetail._scoring.metrics.geoVelocityFlag, value: selectedDetail._scoring.metrics.geoVelocityFlag ? "FLAGGED" : "OK" },
+                        { label: "Account Age", flag: selectedDetail._scoring.metrics.accountAgeDays < 90, value: `${selectedDetail._scoring.metrics.accountAgeDays}d` },
+                        { label: "Fraud History", flag: selectedDetail._scoring.metrics.historicalFraudExposureFlag, value: selectedDetail._scoring.metrics.historicalFraudExposureFlag ? "YES" : "NO" },
+                      ].map((item, i) => (
+                        <motion.div
+                          key={item.label}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.2 + i * 0.04, duration: 0.25 }}
+                          className="flex items-center justify-between text-[11px]"
+                        >
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                            {item.value}
+                          </Badge>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Explainable Reasons */}
+                  {selectedDetail._scoring.reasons.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4, duration: 0.3 }}
+                      className="space-y-1.5 pt-2 border-t border-border/50"
+                    >
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
+                      {selectedDetail.riskScore >= 50 && (
+                        <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>
+                      )}
+                      <ul className="space-y-1">
+                        {selectedDetail._scoring.reasons.map((r, i) => (
+                          <motion.li
+                            key={i}
+                            initial={{ opacity: 0, x: -6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.45 + i * 0.06, duration: 0.25 }}
+                            className="flex items-start gap-1.5 text-[11px] text-foreground"
+                          >
+                            <span className="mt-1 h-1 w-1 rounded-full bg-primary shrink-0" />
+                            {r}
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center justify-center py-12 text-center"
+                >
+                  <BarChart3 className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs text-muted-foreground">Click a transaction to view<br />dataset-driven risk analysis</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </CardContent>
         </Card>
       </div>

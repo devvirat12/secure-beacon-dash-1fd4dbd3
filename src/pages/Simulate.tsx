@@ -17,6 +17,8 @@ import { userDataset, getUpiInfo } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import { analyzeTransaction, confirmTransaction } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useTransactionStore } from "@/lib/transaction-store";
+import { getRiskLevel } from "@/lib/scoring-engine";
 
 type TransactionType = "standard" | "upi" | "payment_link";
 
@@ -58,6 +60,7 @@ const riskBadgeStyle = (level: RiskLevel) => {
 const Simulate = () => {
   const { demoMode } = useDemo();
   const { toast } = useToast();
+  const { addTransaction, updateStatus } = useTransactionStore();
   const [txnType, setTxnType] = useState<TransactionType>("standard");
   const [amount, setAmount] = useState("");
   const [city, setCity] = useState("");
@@ -108,6 +111,16 @@ const Simulate = () => {
       }
 
       setResult(analysis);
+      // Push to shared store
+      addTransaction({
+        id: analysis.transactionId,
+        date: new Date().toISOString(),
+        amount: parseFloat(amount),
+        location: city,
+        riskScore: analysis.riskScore,
+        riskLevel: analysis.riskLevel,
+        status: analysis.action === "CONFIRMATION_REQUIRED" ? "Pending" : "Confirmed Legit",
+      });
       if (analysis.action === "CONFIRMATION_REQUIRED") {
         setTimeout(() => setShowModal(true), 1500);
       }
@@ -120,10 +133,12 @@ const Simulate = () => {
 
   const handleConfirm = async (response: "legit" | "fraud") => {
     if (!result) return;
+    const newStatus = response === "legit" ? "Confirmed Legit" as const : "Fraud" as const;
     try {
       if (!demoMode) {
         await confirmTransaction({ transactionId: result.transactionId, userResponse: response });
       }
+      updateStatus(result.transactionId, newStatus);
       toast({
         title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
         description: response === "legit" ? "Behavioral profile updated." : "This transaction has been reported as fraud.",

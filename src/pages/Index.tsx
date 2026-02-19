@@ -3,12 +3,11 @@ import MetricCards from "@/components/MetricCards";
 import BehavioralDNA from "@/components/BehavioralDNA";
 import TransactionsTable from "@/components/TransactionsTable";
 import LiveTransactionStream from "@/components/LiveTransactionStream";
-import { mockUser, mockTransactions, mockRiskTrend } from "@/lib/mock-data";
+import { mockUser, mockRiskTrend } from "@/lib/mock-data";
 import { Shield } from "lucide-react";
 
 const Index = () => {
   const user = mockUser;
-  const transactions = mockTransactions;
   const riskTrend = mockRiskTrend;
 
   return (
@@ -18,7 +17,7 @@ const Index = () => {
         <MetricCards user={user} />
         <LiveTransactionStream />
         <BehavioralDNA user={user} riskTrend={riskTrend} />
-        <TransactionsTable transactions={transactions} />
+        <TransactionsTable />
       </main>
       <footer className="glass-header px-6 py-4">
         <div className="mx-auto max-w-7xl flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
