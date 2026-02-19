@@ -92,7 +92,7 @@ const Simulate = () => {
       }
       toast({
         title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
-        description: response === "legit" ? "UPI behavioral profile updated." : "This transaction has been reported as UPI fraud.",
+        description: response === "legit" ? "Behavioral profile updated." : "This transaction has been reported as fraud.",
       });
     } catch {
       toast({ title: "Error", description: "Failed to confirm transaction", variant: "destructive" });
@@ -110,7 +110,7 @@ const Simulate = () => {
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Send className="h-4 w-4 text-primary" />
-              Analyze UPI Transaction
+              Analyze Transaction
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -156,7 +156,7 @@ const Simulate = () => {
               </div>
               <div className="sm:col-span-2">
                 <Button type="submit" className="w-full" disabled={loading || !amount || !city || !upiId}>
-                  {loading ? "Analyzing..." : "Analyze UPI Transaction"}
+                  {loading ? "Analyzing..." : "Analyze Transaction"}
                 </Button>
               </div>
             </form>

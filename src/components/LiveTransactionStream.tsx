@@ -126,7 +126,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
     );
     toast({
       title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
-      description: response === "legit" ? "UPI behavioral profile updated." : "Transaction reported as UPI fraud.",
+      description: response === "legit" ? "Behavioral profile updated." : "Transaction reported as fraud.",
     });
     setShowModal(false);
   };
@@ -275,7 +275,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
                   <div className="space-y-1.5 pt-2 border-t border-border">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
                     {selectedDetail.riskScore >= 50 && (
-                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to deviation from Indian UPI behavioral profile.</p>
+                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>
                     )}
                     <ul className="space-y-1">
                       {selectedDetail._scoring.reasons.map((r, i) => (
