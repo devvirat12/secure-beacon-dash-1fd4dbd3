@@ -13,7 +13,7 @@ export interface UserProfile {
 }
 
 export type RiskLevel = "SAFE" | "WARNING" | "HIGH_RISK";
-export type TransactionStatus = "Pending" | "Confirmed Legit" | "Fraud";
+export type TransactionStatus = "Pending" | "Analyzed" | "Confirmed Legit" | "Fraud";
 
 export interface Transaction {
   id: string;

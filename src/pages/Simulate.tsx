@@ -111,16 +111,18 @@ const Simulate = () => {
       }
 
       setResult(analysis);
-      // Push to shared store
-      addReviewedTransaction({
+      // Immediately save to ReviewedTransactionStore with "Analyzed" status
+      const txnEntry = {
         id: analysis.transactionId,
         date: new Date().toISOString(),
         amount: parseFloat(amount),
         location: city,
         riskScore: analysis.riskScore,
         riskLevel: analysis.riskLevel,
-        status: analysis.action === "CONFIRMATION_REQUIRED" ? "Pending" : "Confirmed Legit",
-      });
+        status: "Analyzed" as const,
+      };
+      addReviewedTransaction(txnEntry);
+      console.log("[ReviewedStore] Transaction added after Analyze:", txnEntry);
       if (analysis.action === "CONFIRMATION_REQUIRED") {
         setTimeout(() => setShowModal(true), 1500);
       }
