@@ -1,12 +1,26 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import Header from "@/components/Header";
+import MetricCards from "@/components/MetricCards";
+import BehavioralDNA from "@/components/BehavioralDNA";
+import TransactionsTable from "@/components/TransactionsTable";
+import { useDemo } from "@/lib/demo-context";
+import { mockUser, mockTransactions, mockRiskTrend } from "@/lib/mock-data";
 
 const Index = () => {
+  const { demoMode } = useDemo();
+
+  // In production, fetch from API. For now, use demo data.
+  const user = mockUser;
+  const transactions = mockTransactions;
+  const riskTrend = mockRiskTrend;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="mx-auto max-w-7xl space-y-6 p-6">
+        <MetricCards user={user} />
+        <BehavioralDNA user={user} riskTrend={riskTrend} />
+        <TransactionsTable transactions={transactions} />
+      </main>
     </div>
   );
 };
