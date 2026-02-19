@@ -22,7 +22,7 @@ const BehavioralDNA = ({ user, riskTrend }: BehavioralDNAProps) => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Brain className="h-4 w-4 text-primary" />
-            Behavioral Profile (Transaction DNA)
+            Behavioral DNA Profile
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
