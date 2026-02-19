@@ -14,12 +14,34 @@ export async function fetchTransactions(userId: string): Promise<Transaction[]> 
   return res.json();
 }
 
+// Extended receiver intelligence fields (all optional)
+export interface ReceiverPayload {
+  receiverId?: string;
+  receiverAccountAge?: number;
+  receiverTotalReceived?: number;
+  receiverTotalTransactions?: number;
+  receiverFraudReports?: number;
+  transactionId?: string;
+  isMerchantVerified?: boolean;
+  isNewBeneficiary?: boolean;
+}
+
+// Extended API response fields (all optional, safe to ignore if absent)
+export interface ReceiverApiResponse {
+  receiver_risk?: number;
+  receiver_reasons?: string[];
+  transaction_id_flag?: boolean;
+  receiver_account_age_flag?: boolean;
+  merchant_flag?: boolean;
+  beneficiary_flag?: boolean;
+}
+
 export async function analyzeTransaction(data: {
   userId: string;
   amount: number;
   location: string;
   timestamp: string;
-}): Promise<AnalysisResult> {
+} & ReceiverPayload): Promise<AnalysisResult & ReceiverApiResponse> {
   const res = await fetch(`${API_BASE_URL}/analyze-transaction`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
