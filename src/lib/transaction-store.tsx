@@ -35,7 +35,10 @@ export function LiveTransactionStoreProvider({ children }: { children: ReactNode
 
 export function useLiveTransactionStore() {
   const ctx = useContext(LiveTransactionStoreContext);
-  if (!ctx) throw new Error("useLiveTransactionStore must be used within LiveTransactionStoreProvider");
+  if (!ctx) {
+    // Fallback for HMR — return no-op store instead of throwing
+    return { liveTransactions: [], addLiveTransaction: () => {}, updateLiveStatus: () => {} } as LiveTransactionStore;
+  }
   return ctx;
 }
 
@@ -78,6 +81,8 @@ export function ReviewedTransactionStoreProvider({ children }: { children: React
 
 export function useReviewedTransactionStore() {
   const ctx = useContext(ReviewedTransactionStoreContext);
-  if (!ctx) throw new Error("useReviewedTransactionStore must be used within ReviewedTransactionStoreProvider");
+  if (!ctx) {
+    return { reviewedTransactions: [], addReviewedTransaction: () => {}, updateReviewedStatus: () => {} } as ReviewedTransactionStore;
+  }
   return ctx;
 }
