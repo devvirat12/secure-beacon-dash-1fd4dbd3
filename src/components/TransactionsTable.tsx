@@ -21,6 +21,7 @@ const riskBadge = (level: RiskLevel) => {
 const statusStyle = (status: string) => {
   if (status === "Confirmed Legit") return "text-safe";
   if (status === "Fraud") return "text-danger";
+  if (status === "Analyzed") return "text-primary";
   return "text-warning";
 };
 
