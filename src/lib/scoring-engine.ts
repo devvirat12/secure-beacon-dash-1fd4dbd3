@@ -326,21 +326,31 @@ export function computeMLScore(metrics: DeviationMetrics): {
 
   const mlReasons: string[] = [];
 
-  // Generate human-readable reasons from top contributors (no raw point values)
-  const significantIso = Object.entries(iso.contributions)
-    .filter(([, v]) => v > 5)
-    .sort(([, a], [, b]) => b - a);
-  const significantLgbm = Object.entries(lgbm.contributions)
-    .filter(([, v]) => v > 5)
-    .sort(([, a], [, b]) => b - a);
+  // Dynamic explanation based on actual per-feature contribution magnitude
+  const allContribs = [
+    ...Object.entries(iso.contributions).map(([k, v]) => ({ model: "Isolation Forest", feature: k, value: v, total: iso.score })),
+    ...Object.entries(lgbm.contributions).map(([k, v]) => ({ model: "LightGBM", feature: k, value: v, total: lgbm.score })),
+  ]
+    .filter((c) => c.value > 3)
+    .sort((a, b) => b.value - a.value);
 
-  if (significantIso.length > 0) {
-    const factors = significantIso.slice(0, 3).map(([k]) => k.toLowerCase());
-    mlReasons.push(`Isolation Forest detected anomaly due to: ${factors.join(", ")}`);
-  }
-  if (significantLgbm.length > 0) {
-    const factors = significantLgbm.slice(0, 3).map(([k]) => k.toLowerCase());
-    mlReasons.push(`LightGBM flagged elevated fraud probability from: ${factors.join(", ")}`);
+  // Only generate explanations when scores are meaningful
+  if (mlScore >= 15) {
+    // Pick top contributors proportional to overall risk
+    const maxReasons = mlScore >= 50 ? 4 : mlScore >= 30 ? 2 : 1;
+    const seen = new Set<string>();
+
+    for (const c of allContribs) {
+      if (seen.size >= maxReasons) break;
+      const key = c.feature.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // Generate description based on contribution intensity relative to model total
+      const intensity = c.total > 0 ? c.value / c.total : 0;
+      const qualifier = intensity > 0.4 ? "significant" : intensity > 0.2 ? "moderate" : "minor";
+      mlReasons.push(`${c.feature} was a ${qualifier} factor in ${c.model} analysis (${c.value}/${c.total})`);
+    }
   }
 
   return {
