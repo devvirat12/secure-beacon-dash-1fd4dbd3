@@ -1,4 +1,5 @@
 import { DatasetUser, HistoricalTransaction, UpiIdInfo } from "./types";
+import { SimTransactionType } from "@/components/SimulationControls";
 
 // UPI ID registry with creation dates
 export const upiIdRegistry: Record<string, UpiIdInfo> = {
@@ -14,7 +15,6 @@ export const upiIdRegistry: Record<string, UpiIdInfo> = {
   "apollo247@hdfcbank": { upiId: "apollo247@hdfcbank", creationDate: "2023-01-10", ageDays: 1136 },
   "electricity.tneb@paytm": { upiId: "electricity.tneb@paytm", creationDate: "2022-08-15", ageDays: 1284 },
   "zomato@ybl": { upiId: "zomato@ybl", creationDate: "2021-11-01", ageDays: 1572 },
-  // Suspicious / mule UPI IDs
   "quickcash9871@ybl": { upiId: "quickcash9871@ybl", creationDate: "2026-02-14", ageDays: 5 },
   "earnmoney.now@okaxis": { upiId: "earnmoney.now@okaxis", creationDate: "2026-02-16", ageDays: 3 },
   "lucky.winner2026@paytm": { upiId: "lucky.winner2026@paytm", creationDate: "2026-02-12", ageDays: 7 },
@@ -138,11 +138,17 @@ export interface SimulationInjection {
   nightTransaction?: boolean;
 }
 
-export function generateDatasetTransaction(injection?: SimulationInjection): HistoricalTransaction & { _userRef: DatasetUser; _upiInfo: UpiIdInfo } {
+export function generateDatasetTransaction(
+  injection?: SimulationInjection,
+  txnType?: SimTransactionType
+): HistoricalTransaction & { _userRef: DatasetUser; _upiInfo: UpiIdInfo } {
   const user = userDataset[Math.floor(Math.random() * userDataset.length)];
   const hasInjection = injection && Object.values(injection).some(Boolean);
   const isAnomaly = hasInjection || Math.random() < 0.25;
   txnCounter++;
+
+  // Determine effective transaction type
+  const effectiveType = txnType || (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
 
   let amount: number;
   let city: string;
@@ -151,7 +157,6 @@ export function generateDatasetTransaction(injection?: SimulationInjection): His
   let timestamp = new Date().toISOString();
 
   if (hasInjection) {
-    // Use simulation flags to craft the transaction
     amount = injection.highAmount
       ? Math.round(user.avgTransactionAmount * (5 + Math.random() * 3))
       : Math.round(user.avgTransactionAmount * (0.5 + Math.random() * 1));
@@ -160,16 +165,17 @@ export function generateDatasetTransaction(injection?: SimulationInjection): His
 
     if (injection.firstTimeBeneficiary || injection.newUpiId) {
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
+    } else if (effectiveType === "upi") {
+      upiId = user.usualUpiIds[Math.floor(Math.random() * user.usualUpiIds.length)];
     } else {
       upiId = user.usualUpiIds[Math.floor(Math.random() * user.usualUpiIds.length)];
     }
 
-    if (injection.paymentLink) {
+    if (injection.paymentLink || effectiveType === "payment_link") {
       paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
     }
 
     if (injection.nightTransaction) {
-      // Force timestamp to 2-5 AM IST (UTC 20:30 - 23:30 previous day)
       const d = new Date();
       d.setUTCHours(21 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60));
       timestamp = d.toISOString();
@@ -199,11 +205,21 @@ export function generateDatasetTransaction(injection?: SimulationInjection): His
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
       paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
     }
+
+    // Force payment link for payment_link type even during organic anomalies
+    if (effectiveType === "payment_link" && !paymentLink) {
+      paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
+    }
   } else {
     const variance = 0.3 + Math.random() * 1.4;
     amount = Math.round(user.avgTransactionAmount * variance * 100) / 100;
     city = user.usualCities[Math.floor(Math.random() * user.usualCities.length)];
     upiId = user.usualUpiIds[Math.floor(Math.random() * user.usualUpiIds.length)];
+
+    // Attach payment link for payment_link type
+    if (effectiveType === "payment_link") {
+      paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
+    }
   }
 
   amount = Math.round(amount);

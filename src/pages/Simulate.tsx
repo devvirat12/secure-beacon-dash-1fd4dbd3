@@ -2,6 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
+import DetectionArchitecture from "@/components/DetectionArchitecture";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, AlertCircle, Link2, CheckCircle, AlertTriangle, Globe } from "lucide-react";
+import { Send, AlertCircle, Link2, Globe } from "lucide-react";
 import { AnalysisResult, RiskLevel } from "@/lib/types";
 import { useDemo } from "@/lib/demo-context";
 import { userDataset, getUpiInfo } from "@/lib/dataset";
@@ -136,6 +137,9 @@ const Simulate = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
+        {/* Detection flow moved here */}
+        <DetectionArchitecture />
+
         <Card className="rounded-2xl shadow-sm border-border/50">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -145,17 +149,14 @@ const Simulate = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {/* Transaction Type */}
               <div className="space-y-2 sm:col-span-2">
                 <Label className="text-xs">Transaction Type</Label>
                 <div className="flex gap-2 flex-wrap">
                   {(["standard", "upi", "payment_link"] as TransactionType[]).map((t) => (
                     <Button
-                      key={t}
-                      type="button"
+                      key={t} type="button"
                       variant={txnType === t ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs"
+                      size="sm" className="text-xs"
                       onClick={() => { setTxnType(t); setResult(null); setLinkAnalysis(null); }}
                     >
                       {txnTypeLabels[t]}
@@ -178,7 +179,6 @@ const Simulate = () => {
                 </Select>
               </div>
 
-              {/* UPI ID — only for UPI type */}
               {txnType === "upi" && (
                 <div className="space-y-2">
                   <Label className="text-xs">UPI ID</Label>
@@ -191,19 +191,13 @@ const Simulate = () => {
                 </div>
               )}
 
-              {/* Payment Link — only for payment_link type */}
               {txnType === "payment_link" && (
                 <div className="space-y-2">
                   <Label className="text-xs flex items-center gap-1.5">
                     <Link2 className="h-3 w-3 text-primary" />
                     Payment Link URL
                   </Label>
-                  <Input
-                    placeholder="e.g. bit.ly/win50k or razorpay.com/pay"
-                    value={paymentLinkInput}
-                    onChange={(e) => setPaymentLinkInput(e.target.value)}
-                    required
-                  />
+                  <Input placeholder="e.g. bit.ly/win50k or razorpay.com/pay" value={paymentLinkInput} onChange={(e) => setPaymentLinkInput(e.target.value)} required />
                 </div>
               )}
 
