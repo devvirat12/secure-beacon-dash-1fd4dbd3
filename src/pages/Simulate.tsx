@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, AlertCircle, Link2, Globe, Shield, UserCheck } from "lucide-react";
 import { AnalysisResult, RiskLevel, ScoringResult } from "@/lib/types";
@@ -78,15 +78,9 @@ const Simulate = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  // ── Receiver Intelligence Fields (optional, additive) ──────────────────────
+  // ── Receiver Intelligence Fields (minimal, additive) ──────────────────────
   const [receiverId, setReceiverId] = useState("");
-  const [receiverAccountAge, setReceiverAccountAge] = useState("");
-  const [receiverTotalReceived, setReceiverTotalReceived] = useState("");
-  const [receiverTotalTransactions, setReceiverTotalTransactions] = useState("");
-  const [receiverFraudReports, setReceiverFraudReports] = useState("");
   const [transactionId, setTransactionId] = useState("");
-  const [isMerchantVerified, setIsMerchantVerified] = useState(false);
-  const [isNewBeneficiary, setIsNewBeneficiary] = useState(false);
 
   const simFlags = {
     highAmount: true,
@@ -123,15 +117,9 @@ const Simulate = () => {
           amount: parseFloat(amount),
           location: city,
           timestamp: new Date().toISOString(),
-          // ── Receiver intelligence fields (appended, non-breaking) ──
+          // ── Receiver intelligence fields (minimal, non-breaking) ──
           ...(receiverId && { receiverId }),
-          ...(receiverAccountAge && { receiverAccountAge: parseFloat(receiverAccountAge) }),
-          ...(receiverTotalReceived && { receiverTotalReceived: parseFloat(receiverTotalReceived) }),
-          ...(receiverTotalTransactions && { receiverTotalTransactions: parseFloat(receiverTotalTransactions) }),
-          ...(receiverFraudReports && { receiverFraudReports: parseFloat(receiverFraudReports) }),
           ...(transactionId && { transactionId }),
-          isMerchantVerified,
-          isNewBeneficiary,
         });
         // Capture optional receiver fields from API response
         setReceiverApiData({
@@ -142,11 +130,6 @@ const Simulate = () => {
           merchant_flag: apiResult.merchant_flag,
           beneficiary_flag: apiResult.beneficiary_flag,
           receiverId: receiverId || undefined,
-          receiverAccountAge: receiverAccountAge ? parseFloat(receiverAccountAge) : undefined,
-          receiverTotalReceived: receiverTotalReceived ? parseFloat(receiverTotalReceived) : undefined,
-          receiverTotalTransactions: receiverTotalTransactions ? parseFloat(receiverTotalTransactions) : undefined,
-          receiverFraudReports: receiverFraudReports ? parseFloat(receiverFraudReports) : undefined,
-          isMerchantVerified: isMerchantVerified,
         });
         // Wrap API result as ScoringResult with defaults
         analysis = {
@@ -291,7 +274,7 @@ const Simulate = () => {
                 </Select>
               </div>
 
-              {/* ── Receiver Intelligence Fields (optional, additive) ──────── */}
+              {/* ── Receiver Intelligence Fields (minimal, additive) ──────── */}
               <div className="sm:col-span-2 pt-2 border-t border-border/50">
                 <div className="flex items-center gap-1.5 mb-3">
                   <UserCheck className="h-3.5 w-3.5 text-primary" />
@@ -303,32 +286,8 @@ const Simulate = () => {
                     <Input placeholder="e.g. RCV-001" value={receiverId} onChange={(e) => setReceiverId(e.target.value)} className="bg-secondary/50 border-border h-9 text-xs" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Receiver Account Age (days)</Label>
-                    <Input type="number" placeholder="e.g. 30" value={receiverAccountAge} onChange={(e) => setReceiverAccountAge(e.target.value)} min="0" className="bg-secondary/50 border-border h-9 text-xs" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Receiver Total Received (₹)</Label>
-                    <Input type="number" placeholder="e.g. 50000" value={receiverTotalReceived} onChange={(e) => setReceiverTotalReceived(e.target.value)} min="0" className="bg-secondary/50 border-border h-9 text-xs" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Receiver Total Transactions</Label>
-                    <Input type="number" placeholder="e.g. 12" value={receiverTotalTransactions} onChange={(e) => setReceiverTotalTransactions(e.target.value)} min="0" className="bg-secondary/50 border-border h-9 text-xs" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Receiver Fraud Reports</Label>
-                    <Input type="number" placeholder="e.g. 0" value={receiverFraudReports} onChange={(e) => setReceiverFraudReports(e.target.value)} min="0" className="bg-secondary/50 border-border h-9 text-xs" />
-                  </div>
-                  <div className="space-y-1.5">
                     <Label className="text-xs">Transaction ID (optional)</Label>
                     <Input placeholder="e.g. TXN-20260219" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="bg-secondary/50 border-border h-9 text-xs" />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2.5">
-                    <Label className="text-xs text-muted-foreground cursor-pointer">Is Merchant Verified?</Label>
-                    <Switch checked={isMerchantVerified} onCheckedChange={setIsMerchantVerified} />
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-3 py-2.5">
-                    <Label className="text-xs text-muted-foreground cursor-pointer">Is New Beneficiary?</Label>
-                    <Switch checked={isNewBeneficiary} onCheckedChange={setIsNewBeneficiary} />
                   </div>
                 </div>
               </div>
@@ -470,16 +429,10 @@ const Simulate = () => {
           <ReceiverRiskPanel data={receiverApiData} />
         )}
 
-        {/* ── Demo mode: show panel with manually-entered receiver data ──────── */}
-        {result && !receiverApiData && (receiverId || receiverAccountAge || receiverFraudReports || isMerchantVerified !== false || isNewBeneficiary) && (
+        {/* ── Demo mode: show panel with receiver ID if provided ──────── */}
+        {result && !receiverApiData && receiverId && (
           <ReceiverRiskPanel data={{
             receiverId: receiverId || undefined,
-            receiverAccountAge: receiverAccountAge ? parseFloat(receiverAccountAge) : undefined,
-            receiverTotalReceived: receiverTotalReceived ? parseFloat(receiverTotalReceived) : undefined,
-            receiverTotalTransactions: receiverTotalTransactions ? parseFloat(receiverTotalTransactions) : undefined,
-            receiverFraudReports: receiverFraudReports ? parseFloat(receiverFraudReports) : undefined,
-            isMerchantVerified: isMerchantVerified,
-            beneficiary_flag: isNewBeneficiary ? true : undefined,
           }} />
         )}
 
