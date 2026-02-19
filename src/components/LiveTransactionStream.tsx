@@ -182,11 +182,12 @@ const LiveTransactionStream = () => {
               <BarChart3 className="h-4 w-4 text-primary" />
               Risk Analysis
             </CardTitle>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Detection Layer: Flagging Only (No Automatic Blocking)</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedDetail?._scoring ? (
               <>
-                {/* Score breakdown */}
+                {/* Final Score */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Final Risk Score</span>
@@ -197,59 +198,66 @@ const LiveTransactionStream = () => {
                   <Badge variant="outline" className={`${riskBadgeStyle(selectedDetail.riskLevel)}`}>
                     {riskLabels[selectedDetail.riskLevel]}
                   </Badge>
-                  <div className="grid grid-cols-3 gap-2 pt-2">
+
+                  {/* Formula */}
+                  <div className="rounded-lg bg-muted p-2">
+                    <p className="text-[10px] text-muted-foreground text-center font-mono">
+                      Final = (Rule × 0.6) + (ML × 0.4)
+                    </p>
+                    <p className="text-[10px] text-muted-foreground text-center font-mono mt-0.5">
+                      = ({selectedDetail._scoring.ruleScore} × 0.6) + ({selectedDetail._scoring.mlScore} × 0.4) = <span className="font-bold text-foreground">{selectedDetail.riskScore}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* A. Rule-Based Engine */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">A. Rule-Based Engine</p>
+                    <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
+                  </div>
+                  <div className="space-y-1.5">
                     {[
-                      { label: "Rule", value: selectedDetail._scoring.ruleScore },
-                      { label: "ML", value: selectedDetail._scoring.mlScore },
-                      { label: "Behavioral", value: selectedDetail._scoring.behavioralScore },
-                    ].map((s) => (
-                      <div key={s.label} className="rounded-lg bg-muted p-2 text-center">
-                        <p className="text-[10px] text-muted-foreground">{s.label}</p>
-                        <p className="text-sm font-bold text-foreground">{s.value}</p>
+                      { label: "Amount Deviation Trigger", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
+                      { label: "Location Anomaly Trigger", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
+                      { label: "Income Ratio Trigger", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
+                      { label: "Frequency Spike Trigger", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
+                    ].map((rule) => (
+                      <div key={rule.label} className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">{rule.label}</span>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${rule.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                          {rule.value}
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Deviation Metrics */}
+                {/* B. ML Anomaly Engine */}
                 <div className="space-y-2 pt-2 border-t border-border">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Deviation Metrics</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs">
-                      <TrendingUp className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Amount Deviation</span>
-                      <span className={`ml-auto font-semibold ${selectedDetail._scoring.metrics.amountDeviation > 3 ? "text-danger" : "text-foreground"}`}>
-                        {selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine</p>
+                    <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Weighted Deviation Score</span>
+                      <span className="font-semibold text-foreground">{selectedDetail._scoring.mlScore}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <BarChart3 className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Monthly Spend Ratio</span>
-                      <span className={`ml-auto font-semibold ${selectedDetail._scoring.metrics.monthlySpendRatio > 1.5 ? "text-warning" : "text-foreground"}`}>
-                        {selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Location Anomaly</span>
-                      <Badge variant="outline" className={`ml-auto text-[10px] px-1.5 py-0 ${selectedDetail._scoring.metrics.locationFlag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                        {selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <Zap className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">Frequency Spike</span>
-                      <Badge variant="outline" className={`ml-auto text-[10px] px-1.5 py-0 ${selectedDetail._scoring.metrics.frequencySpike ? "bg-warning/15 text-warning border-warning/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                        {selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL"}
-                      </Badge>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Behavioral Drift</span>
+                      <span className="font-semibold text-foreground">{selectedDetail._scoring.behavioralScore}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Reasons */}
+                {/* Explainable Reasons */}
                 {selectedDetail._scoring.reasons.length > 0 && (
                   <div className="space-y-1.5 pt-2 border-t border-border">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Why Flagged</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
+                    {selectedDetail.riskScore >= 50 && (
+                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>
+                    )}
                     <ul className="space-y-1">
                       {selectedDetail._scoring.reasons.map((r, i) => (
                         <li key={i} className="flex items-start gap-1.5 text-[11px] text-foreground">

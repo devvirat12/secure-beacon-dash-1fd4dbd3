@@ -20,8 +20,8 @@ const ConfirmationModal = ({ open, onOpenChange, result, onConfirm }: Confirmati
             <AlertTriangle className="h-6 w-6 text-warning" />
           </div>
           <DialogTitle className="text-center text-lg">Unusual Transaction Detected</DialogTitle>
-          <DialogDescription className="text-center">
-            This transaction requires your confirmation
+          <DialogDescription className="text-center text-xs">
+            Transaction flagged due to significant behavioral deviation. No automatic blocking — your confirmation is required.
           </DialogDescription>
         </DialogHeader>
 
