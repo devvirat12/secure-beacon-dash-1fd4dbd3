@@ -4,10 +4,10 @@ import { ArrowRight, Radio, BarChart3, Brain, Shield, Layers, UserCheck, Chevron
 import { useState } from "react";
 
 const steps = [
-  { icon: Radio, label: "UPI Stream", desc: "Real-time ingestion" },
+  { icon: Radio, label: "Transaction Stream", desc: "Real-time ingestion" },
   { icon: BarChart3, label: "Feature Extraction", desc: "Deviation metrics" },
   { icon: Shield, label: "Rule-Based Scoring", desc: "Threshold triggers" },
-  { icon: Brain, label: "ML Anomaly Scoring", desc: "UPI intelligence" },
+  { icon: Brain, label: "ML Anomaly Scoring", desc: "Behavioral intelligence" },
   { icon: Layers, label: "Hybrid Risk Score", desc: "Rule×0.6 + ML×0.4" },
   { icon: UserCheck, label: "Human Confirmation", desc: "Non-blocking alert" },
 ];

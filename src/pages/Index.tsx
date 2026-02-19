@@ -73,7 +73,7 @@ const Index = () => {
       <footer className="border-t border-border bg-card px-6 py-4">
         <div className="mx-auto max-w-7xl flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <Shield className="h-3 w-3" />
-          <span>This system uses lightweight hybrid scoring suitable for real-time UPI edge deployment. Detection Layer: Flagging Only — No Automatic Blocking.</span>
+          <span>This system uses lightweight hybrid scoring suitable for real-time edge deployment. Detection Layer: Flagging Only — No Automatic Blocking.</span>
         </div>
       </footer>
     </div>
