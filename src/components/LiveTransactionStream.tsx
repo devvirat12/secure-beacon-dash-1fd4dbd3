@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, Link2, UserX, Clock } from "lucide-react";
 import { RiskLevel, ScoringResult, LiveTransaction } from "@/lib/types";
-import { generateDatasetTransaction, getUserProfile } from "@/lib/dataset";
+import { generateDatasetTransaction, getUserProfile, SimulationInjection } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
+import { SimulationFlags } from "@/components/SimulationControls";
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -19,8 +20,8 @@ const riskBadgeStyle = (level: RiskLevel) => {
 
 const riskLabels: Record<RiskLevel, string> = { SAFE: "Safe", WARNING: "Warning", HIGH_RISK: "High Risk" };
 
-function generateScoredTransaction(recentCountMap: Map<string, number>): LiveTransaction & { _scoring?: ScoringResult } {
-  const raw = generateDatasetTransaction();
+function generateScoredTransaction(recentCountMap: Map<string, number>, injection?: SimulationInjection): LiveTransaction & { _scoring?: ScoringResult } {
+  const raw = generateDatasetTransaction(injection);
   const user = raw._userRef;
   const recentCount = recentCountMap.get(user.userId) || 0;
 
@@ -47,7 +48,11 @@ function generateScoredTransaction(recentCountMap: Map<string, number>): LiveTra
   };
 }
 
-const LiveTransactionStream = () => {
+interface LiveTransactionStreamProps {
+  simulationFlags?: SimulationFlags;
+}
+
+const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) => {
   const [transactions, setTransactions] = useState<(LiveTransaction & { _scoring?: ScoringResult })[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedScoring, setSelectedScoring] = useState<ScoringResult | null>(null);
@@ -64,11 +69,14 @@ const LiveTransactionStream = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const newTxn = generateScoredTransaction(frequencyMap.current);
+      const injection: SimulationInjection | undefined = simulationFlags && Object.values(simulationFlags).some(Boolean)
+        ? simulationFlags
+        : undefined;
+      const newTxn = generateScoredTransaction(frequencyMap.current, injection);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [simulationFlags]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;

@@ -1,6 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Layers, ArrowRight, Radio, BarChart3, Brain, Shield, UserCheck, Smartphone } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowRight, Radio, BarChart3, Brain, Shield, Layers, UserCheck, ChevronDown } from "lucide-react";
+import { useState } from "react";
 
 const steps = [
   { icon: Radio, label: "UPI Stream", desc: "Real-time ingestion" },
@@ -12,24 +13,27 @@ const steps = [
 ];
 
 const DetectionArchitecture = () => {
+  const [open, setOpen] = useState(false);
+
   return (
-    <Card className="rounded-2xl shadow-sm border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Layers className="h-4 w-4 text-primary" />
-          Detection Architecture
-          <Badge variant="outline" className="ml-auto text-[10px] bg-primary/10 text-primary border-primary/30">
-            Indian UPI Pipeline
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="flex items-center gap-3">
+        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs px-3 py-1">
+          <Shield className="h-3 w-3 mr-1.5" />
+          Detection Layer Active – Hybrid Rule + ML
+        </Badge>
+        <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+          <span>{open ? "Hide" : "View"} Detection Flow</span>
+          <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent className="mt-3">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 rounded-xl bg-muted/50 p-3">
           {steps.map((step, i) => (
             <div key={step.label} className="flex items-center gap-1 shrink-0">
-              <div className="flex flex-col items-center gap-1.5 rounded-xl bg-muted p-2.5 min-w-[100px]">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
-                  <step.icon className="h-3.5 w-3.5 text-primary" />
+              <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card p-2.5 min-w-[90px] shadow-sm">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10">
+                  <step.icon className="h-3 w-3 text-primary" />
                 </div>
                 <p className="text-[10px] font-semibold text-foreground text-center leading-tight">{step.label}</p>
                 <p className="text-[9px] text-muted-foreground text-center">{step.desc}</p>
@@ -40,8 +44,8 @@ const DetectionArchitecture = () => {
             </div>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 
