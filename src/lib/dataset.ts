@@ -124,51 +124,76 @@ const categories = ["Food & Dining", "Shopping", "Groceries", "Travel", "Enterta
 const suspiciousUpiIds = ["quickcash9871@ybl", "earnmoney.now@okaxis", "lucky.winner2026@paytm", "invest.returns@ybl", "refund.process@oksbi"];
 const normalUpiIds = ["bigbasket@razorpay", "swiggy@paytm", "flipkart@axl", "irctc@sbi", "apollo247@hdfcbank", "electricity.tneb@paytm", "zomato@ybl"];
 
-let txnCounter = 1000;
-
 export function getUpiInfo(upiId: string): UpiIdInfo {
   return upiIdRegistry[upiId] || { upiId, creationDate: "2026-02-18", ageDays: 1 };
 }
 
-/**
- * Generate a transaction for a random user from the Indian dataset.
- * ~25% chance of injecting an anomaly.
- */
-export function generateDatasetTransaction(): HistoricalTransaction & { _userRef: DatasetUser; _upiInfo: UpiIdInfo } {
+let txnCounter = 1000;
+
+export interface SimulationInjection {
+  highAmount?: boolean;
+  newUpiId?: boolean;
+  firstTimeBeneficiary?: boolean;
+  paymentLink?: boolean;
+  nightTransaction?: boolean;
+}
+
+export function generateDatasetTransaction(injection?: SimulationInjection): HistoricalTransaction & { _userRef: DatasetUser; _upiInfo: UpiIdInfo } {
   const user = userDataset[Math.floor(Math.random() * userDataset.length)];
-  const isAnomaly = Math.random() < 0.25;
+  const hasInjection = injection && Object.values(injection).some(Boolean);
+  const isAnomaly = hasInjection || Math.random() < 0.25;
   txnCounter++;
 
   let amount: number;
   let city: string;
   let upiId: string;
   let paymentLink: string | undefined;
+  let timestamp = new Date().toISOString();
 
-  if (isAnomaly) {
+  if (hasInjection) {
+    // Use simulation flags to craft the transaction
+    amount = injection.highAmount
+      ? Math.round(user.avgTransactionAmount * (5 + Math.random() * 3))
+      : Math.round(user.avgTransactionAmount * (0.5 + Math.random() * 1));
+
+    city = user.usualCities[Math.floor(Math.random() * user.usualCities.length)];
+
+    if (injection.firstTimeBeneficiary || injection.newUpiId) {
+      upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
+    } else {
+      upiId = user.usualUpiIds[Math.floor(Math.random() * user.usualUpiIds.length)];
+    }
+
+    if (injection.paymentLink) {
+      paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
+    }
+
+    if (injection.nightTransaction) {
+      // Force timestamp to 2-5 AM IST (UTC 20:30 - 23:30 previous day)
+      const d = new Date();
+      d.setUTCHours(21 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60));
+      timestamp = d.toISOString();
+    }
+  } else if (isAnomaly) {
     const anomalyType = Math.random();
     if (anomalyType < 0.25) {
-      // High amount + suspicious UPI
       amount = user.avgTransactionAmount * (3.5 + Math.random() * 4);
       city = user.usualCities[Math.floor(Math.random() * user.usualCities.length)];
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
     } else if (anomalyType < 0.45) {
-      // Foreign city
       amount = user.avgTransactionAmount * (0.8 + Math.random() * 1.5);
       city = anomalousCities[Math.floor(Math.random() * anomalousCities.length)];
       upiId = normalUpiIds[Math.floor(Math.random() * normalUpiIds.length)];
     } else if (anomalyType < 0.65) {
-      // Payment link fraud
       amount = user.avgTransactionAmount * (2 + Math.random() * 3);
       city = user.usualCities[Math.floor(Math.random() * user.usualCities.length)];
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
       paymentLink = suspiciousPaymentLinks[Math.floor(Math.random() * suspiciousPaymentLinks.length)];
     } else if (anomalyType < 0.8) {
-      // Night transaction + high amount
       amount = user.avgTransactionAmount * (3 + Math.random() * 3);
       city = user.usualCities[Math.floor(Math.random() * user.usualCities.length)];
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
     } else {
-      // Everything suspicious
       amount = user.avgTransactionAmount * (4 + Math.random() * 5);
       city = anomalousCities[Math.floor(Math.random() * anomalousCities.length)];
       upiId = suspiciousUpiIds[Math.floor(Math.random() * suspiciousUpiIds.length)];
@@ -189,7 +214,7 @@ export function generateDatasetTransaction(): HistoricalTransaction & { _userRef
     transactionId: `txn-${txnCounter}`,
     userId: user.userId,
     amount,
-    timestamp: new Date().toISOString(),
+    timestamp,
     city,
     upiId,
     category: categories[Math.floor(Math.random() * categories.length)],
