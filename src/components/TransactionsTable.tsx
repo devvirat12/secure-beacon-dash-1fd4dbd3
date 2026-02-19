@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTransactionStore } from "@/lib/transaction-store";
+import { useReviewedTransactionStore } from "@/lib/transaction-store";
 import { Activity } from "lucide-react";
 
 const riskBadge = (level: RiskLevel) => {
@@ -25,10 +25,10 @@ const statusStyle = (status: string) => {
 };
 
 const TransactionsTable = () => {
-  const { transactions } = useTransactionStore();
+  const { reviewedTransactions } = useReviewedTransactionStore();
   const [filter, setFilter] = useState<"all" | RiskLevel>("all");
 
-  const filtered = filter === "all" ? transactions : transactions.filter((t) => t.riskLevel === filter);
+  const filtered = filter === "all" ? reviewedTransactions : reviewedTransactions.filter((t) => t.riskLevel === filter);
 
   return (
     <Card className="glass-card rounded-2xl">
@@ -37,9 +37,9 @@ const TransactionsTable = () => {
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
             Recent Transactions
-            {transactions.length > 0 && (
+            {reviewedTransactions.length > 0 && (
               <Badge variant="outline" className="ml-1 text-[10px] bg-primary/10 text-primary border-primary/30">
-                {transactions.length}
+                {reviewedTransactions.length}
               </Badge>
             )}
           </CardTitle>
@@ -94,7 +94,7 @@ const TransactionsTable = () => {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-xs">
-                  {transactions.length === 0 ? "No transactions yet — simulate or stream transactions to see them here" : "No transactions match this filter"}
+                  {reviewedTransactions.length === 0 ? "No reviewed transactions yet — analyze or confirm transactions to see them here" : "No transactions match this filter"}
                 </TableCell>
               </TableRow>
             )}
