@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { useSyncExternalStore, useCallback, ReactNode } from "react";
 import { Transaction } from "@/lib/types";
 
 /**
- * Module-level singleton stores — survive HMR and guarantee shared state.
+ * Window-level singleton stores — guaranteed to survive HMR and module duplication.
  */
 type Listener = () => void;
 
@@ -15,111 +15,72 @@ class TransactionStore<T extends Transaction> {
     this.maxItems = maxItems;
   }
 
-  getItems() { return this.items; }
+  getSnapshot = (): T[] => this.items;
 
   add(item: T) {
     if (this.items.some((t) => t.id === item.id)) return;
     this.items = [item, ...this.items].slice(0, this.maxItems);
     console.log(`[TransactionStore] Added ${item.id}, total: ${this.items.length}`, item);
-    this.notify();
+    this.emit();
   }
 
   updateStatus(id: string, status: Transaction["status"]) {
     this.items = this.items.map((t) => (t.id === id ? { ...t, status } : t));
     console.log(`[TransactionStore] Updated ${id} → ${status}`);
-    this.notify();
+    this.emit();
   }
 
-  subscribe(listener: Listener) {
+  subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
+    return () => { this.listeners.delete(listener); };
+  };
 
-  private notify() {
+  private emit() {
     this.listeners.forEach((l) => l());
   }
 }
 
-// Module-level singletons — shared across all components, survive HMR
-const liveStore = new TransactionStore<Transaction & { _scoring?: any; _txnType?: string }>(50);
-const reviewedStore = new TransactionStore<Transaction>(100);
-
-// ── Live Transaction Store ──
-
-function useSyncedStore<T extends Transaction>(store: TransactionStore<T>) {
-  const [items, setItems] = useState<T[]>(store.getItems());
-  useEffect(() => {
-    setItems(store.getItems()); // sync on mount
-    const unsub = store.subscribe(() => setItems([...store.getItems()]));
-    return () => { unsub(); };
-  }, [store]);
-  return items;
+// Window-level singletons — cannot be duplicated by Vite HMR
+declare global {
+  interface Window {
+    __liveStore?: TransactionStore<Transaction & { _scoring?: any; _txnType?: string }>;
+    __reviewedStore?: TransactionStore<Transaction>;
+  }
 }
 
-interface LiveTransactionStoreAPI {
-  liveTransactions: (Transaction & { _scoring?: any; _txnType?: string })[];
-  addLiveTransaction: (txn: Transaction & { _scoring?: any; _txnType?: string }) => void;
-  updateLiveStatus: (id: string, status: Transaction["status"]) => void;
+if (!window.__liveStore) {
+  window.__liveStore = new TransactionStore<Transaction & { _scoring?: any; _txnType?: string }>(50);
+}
+if (!window.__reviewedStore) {
+  window.__reviewedStore = new TransactionStore<Transaction>(100);
 }
 
-const LiveCtx = createContext<LiveTransactionStoreAPI | null>(null);
+const liveStore = window.__liveStore;
+const reviewedStore = window.__reviewedStore;
+
+// ── Providers (no-op wrappers for API compatibility) ──
 
 export function LiveTransactionStoreProvider({ children }: { children: ReactNode }) {
-  const liveTransactions = useSyncedStore(liveStore);
-  const addLiveTransaction = useCallback((txn: Transaction & { _scoring?: any; _txnType?: string }) => liveStore.add(txn), []);
-  const updateLiveStatus = useCallback((id: string, status: Transaction["status"]) => liveStore.updateStatus(id, status), []);
-
-  return (
-    <LiveCtx.Provider value={{ liveTransactions, addLiveTransaction, updateLiveStatus }}>
-      {children}
-    </LiveCtx.Provider>
-  );
+  return <>{children}</>;
 }
-
-export function useLiveTransactionStore(): LiveTransactionStoreAPI {
-  const ctx = useContext(LiveCtx);
-  if (!ctx) {
-    // HMR fallback — still uses singleton so data isn't lost
-    return {
-      liveTransactions: liveStore.getItems(),
-      addLiveTransaction: (txn) => liveStore.add(txn),
-      updateLiveStatus: (id, s) => liveStore.updateStatus(id, s),
-    };
-  }
-  return ctx;
-}
-
-// ── Reviewed Transaction Store ──
-
-interface ReviewedTransactionStoreAPI {
-  reviewedTransactions: Transaction[];
-  addReviewedTransaction: (txn: Transaction) => void;
-  updateReviewedStatus: (id: string, status: Transaction["status"]) => void;
-}
-
-const ReviewedCtx = createContext<ReviewedTransactionStoreAPI | null>(null);
 
 export function ReviewedTransactionStoreProvider({ children }: { children: ReactNode }) {
-  const reviewedTransactions = useSyncedStore(reviewedStore);
-  const addReviewedTransaction = useCallback((txn: Transaction) => reviewedStore.add(txn), []);
-  const updateReviewedStatus = useCallback((id: string, status: Transaction["status"]) => reviewedStore.updateStatus(id, status), []);
-
-  return (
-    <ReviewedCtx.Provider value={{ reviewedTransactions, addReviewedTransaction, updateReviewedStatus }}>
-      {children}
-    </ReviewedCtx.Provider>
-  );
+  return <>{children}</>;
 }
 
-export function useReviewedTransactionStore(): ReviewedTransactionStoreAPI {
-  const ctx = useContext(ReviewedCtx);
-  if (!ctx) {
-    // HMR fallback — still uses singleton so data isn't lost
-    return {
-      reviewedTransactions: reviewedStore.getItems(),
-      addReviewedTransaction: (txn) => reviewedStore.add(txn),
-      updateReviewedStatus: (id, s) => reviewedStore.updateStatus(id, s),
-    };
-  }
-  return ctx;
+// ── Hooks ──
+
+export function useLiveTransactionStore() {
+  const liveTransactions = useSyncExternalStore(liveStore.subscribe, liveStore.getSnapshot);
+  const addLiveTransaction = useCallback((txn: Transaction & { _scoring?: any; _txnType?: string }) => liveStore.add(txn), []);
+  const updateLiveStatus = useCallback((id: string, status: Transaction["status"]) => liveStore.updateStatus(id, status), []);
+  return { liveTransactions, addLiveTransaction, updateLiveStatus };
+}
+
+export function useReviewedTransactionStore() {
+  const reviewedTransactions = useSyncExternalStore(reviewedStore.subscribe, reviewedStore.getSnapshot);
+  const addReviewedTransaction = useCallback((txn: Transaction) => reviewedStore.add(txn), []);
+  const updateReviewedStatus = useCallback((id: string, status: Transaction["status"]) => reviewedStore.updateStatus(id, status), []);
+  console.log("[useReviewedTransactionStore] current count:", reviewedTransactions.length);
+  return { reviewedTransactions, addReviewedTransaction, updateReviewedStatus };
 }
