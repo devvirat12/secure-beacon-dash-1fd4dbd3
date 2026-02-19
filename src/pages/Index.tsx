@@ -11,15 +11,15 @@ const Index = () => {
   const riskTrend = mockRiskTrend;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-7xl space-y-6 p-6">
+      <main className="mx-auto max-w-7xl space-y-5 p-6">
         <MetricCards user={user} />
         <LiveTransactionStream />
         <BehavioralDNA user={user} riskTrend={riskTrend} />
         <TransactionsTable />
       </main>
-      <footer className="glass-header px-6 py-4">
+      <footer className="border-t border-border mt-6 px-6 py-4">
         <div className="mx-auto max-w-7xl flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <Shield className="h-3 w-3" />
           <span>Lightweight hybrid scoring for real-time edge deployment. Detection Layer: Flagging Only — No Automatic Blocking.</span>
