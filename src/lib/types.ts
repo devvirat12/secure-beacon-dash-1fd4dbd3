@@ -96,6 +96,7 @@ export interface DeviationMetrics {
   accountAgeDays: number;
   transactionTimeRisk: number;
   historicalFraudExposureFlag: boolean;
+  salaryRatio: number;
 }
 
 export interface ScoringResult extends AnalysisResult {

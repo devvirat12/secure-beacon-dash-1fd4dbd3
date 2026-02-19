@@ -12,7 +12,6 @@ function classifyLinkRisk(link?: string): "trusted" | "unknown" | "new" | "none"
 
 /**
  * Compute behavioral deviation metrics for a transaction against a user's profile.
- * Now includes enhanced features: device change, geo-velocity, rapid small txns, etc.
  */
 export function computeDeviations(
   amount: number,
@@ -54,16 +53,12 @@ export function computeDeviations(
     const hour = new Date(timestamp).getUTCHours();
     const istHour = (hour + 5) % 24;
     isNightTransaction = istHour >= 2 && istHour < 5;
-    // Time-based risk: higher risk for late night / early morning
     if (istHour >= 0 && istHour < 6) transactionTimeRisk = 0.8;
     else if (istHour >= 22) transactionTimeRisk = 0.5;
     else transactionTimeRisk = 0.1;
   }
 
-  // Device change detection
   const deviceChangeFlag = deviceId ? !user.deviceFingerprints.includes(deviceId) : false;
-
-  // Rapid small transactions (>3 txns under ₹500 in last hour)
   const rapidSmallTransactionsFlag = amount < 500 && recentTxnCountLastHour >= 3;
 
   // Geo-velocity: impossible travel detection
@@ -72,13 +67,12 @@ export function computeDeviations(
     const timeDiffMs = new Date(timestamp).getTime() - new Date(previousTimestamp).getTime();
     const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
     const citiesAreDifferent = previousCity.toLowerCase() !== city.toLowerCase();
-    // If different city within 1 hour → impossible travel
     if (citiesAreDifferent && timeDiffHours < 1 && timeDiffHours > 0) {
       geoVelocityFlag = true;
     }
   }
 
-  // Beneficiary risk score: composite of UPI age, first-time, and known suspicious patterns
+  // Beneficiary risk score
   let beneficiaryRiskScore = 0;
   if (isFirstTimeBeneficiary) beneficiaryRiskScore += 30;
   if (upiAgeDays < 7) beneficiaryRiskScore += 40;
@@ -88,8 +82,10 @@ export function computeDeviations(
   }
   beneficiaryRiskScore = Math.min(beneficiaryRiskScore, 100);
 
-  // Historical fraud exposure
   const historicalFraudExposureFlag = user.historicalFraudCount > 0;
+
+  // Salary ratio — raw, unclamped
+  const salaryRatio = user.monthlySalary > 0 ? amount / user.monthlySalary : 0;
 
   return {
     amountDeviation,
@@ -109,11 +105,12 @@ export function computeDeviations(
     accountAgeDays: user.accountAgeDays,
     transactionTimeRisk,
     historicalFraudExposureFlag,
+    salaryRatio,
   };
 }
 
 /**
- * Rule-based scoring with deterministic threshold triggers.
+ * Rule-based scoring — proportional scaling, no premature clamping.
  */
 export function computeRuleScore(
   amount: number,
@@ -123,28 +120,47 @@ export function computeRuleScore(
   let ruleScore = 0;
   const reasons: string[] = [];
 
-  // Rule 1: Amount deviation > 3x
-  if (metrics.amountDeviation > 3) {
-    const cappedDev = Math.min(metrics.amountDeviation, 50);
-    const points = Math.min(Math.round(cappedDev * 5), 25);
-    ruleScore += points;
-    if (cappedDev > 10) {
-      reasons.push(`Transaction significantly higher than user's historical average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
+  // Rule 1: Amount deviation — proportional, not capped at 25
+  if (metrics.amountDeviation > 2) {
+    // Linear scale: 2x→5pts, 5x→15pts, 10x→25pts, 50x→35pts, 100x→40pts
+    const dev = metrics.amountDeviation;
+    let points: number;
+    if (dev <= 10) {
+      points = Math.round(5 + (dev - 2) * (20 / 8)); // 5 to 25 over 2x-10x
     } else {
-      reasons.push(`Transaction ${cappedDev.toFixed(1)}x above user's average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
+      points = Math.round(25 + Math.min((dev - 10) / 10, 1.5) * 10); // 25 to 40 for 10x-100x+
+    }
+    ruleScore += points;
+    if (dev > 10) {
+      reasons.push(`Transaction ${Math.round(dev)}x above user's average (₹${user.avgTransactionAmount.toLocaleString("en-IN")}) — extreme deviation`);
+    } else {
+      reasons.push(`Transaction ${dev.toFixed(1)}x above user's average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
     }
   }
 
   // Rule 2: City anomaly
   if (metrics.locationFlag) {
     ruleScore += 20;
-    reasons.push(`Transaction from unfamiliar location — outside usual cities`);
+    reasons.push("Transaction from unfamiliar location — outside usual cities");
   }
 
-  // Rule 3: Amount > 60% monthly salary
-  if (amount > user.monthlySalary * 0.6) {
-    ruleScore += 25;
-    reasons.push(`Transaction exceeds typical monthly salary range`);
+  // Rule 3: Salary ratio — graduated, not binary
+  const salaryRatio = metrics.salaryRatio ?? (user.monthlySalary > 0 ? amount / user.monthlySalary : 0);
+  if (salaryRatio > 0.6) {
+    let points: number;
+    if (salaryRatio > 2) {
+      points = 35; // >200% salary = near-max
+    } else if (salaryRatio > 1) {
+      points = 30; // >100% salary
+    } else {
+      points = 20; // 60-100% salary
+    }
+    ruleScore += points;
+    if (salaryRatio > 1) {
+      reasons.push(`Transaction exceeds monthly salary (${Math.round(salaryRatio * 100)}% of ₹${user.monthlySalary.toLocaleString("en-IN")})`);
+    } else {
+      reasons.push(`Transaction is ${Math.round(salaryRatio * 100)}% of monthly salary`);
+    }
   }
 
   // Rule 4: Frequency spike
@@ -165,7 +181,7 @@ export function computeRuleScore(
     reasons.push("Transaction from unrecognized device");
   }
 
-  // Rule 7: Geo-velocity (impossible travel)
+  // Rule 7: Geo-velocity
   if (metrics.geoVelocityFlag) {
     ruleScore += 20;
     reasons.push("Impossible travel detected: different city within 1 hour");
@@ -183,32 +199,31 @@ export function computeRuleScore(
     reasons.push("User has prior fraud exposure history");
   }
 
+  // Clamp only final rule score
   return { ruleScore: Math.min(ruleScore, 100), reasons };
 }
 
 /**
- * Model 1: Isolation Forest — Unsupervised anomaly detection
- * Builds a feature vector from transaction metrics, computes per-feature anomaly
- * scores using sigmoid-based scaling, then weights by learned feature importance.
- * Output: anomaly_score (0–100)
+ * Isolation Forest — linear scaling for extreme deviations instead of sigmoid squashing.
  */
 export function computeIsolationForestScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
-  // Feature vector: raw values normalised into 0–1 anomaly signals
   const features: { name: string; signal: number; weight: number }[] = [
     {
       name: "Amount Deviation",
-      signal: sigmoid(metrics.amountDeviation, 3, 1.2),   // ramps around 3x
-      weight: 0.22,
+      // Linear normalization: min(deviation / 10, 1) — no sigmoid squashing for extremes
+      signal: Math.min(metrics.amountDeviation / 10, 1),
+      weight: 0.25,
     },
     {
       name: "Spend Ratio",
-      signal: sigmoid(metrics.monthlySpendRatio, 1.5, 2),
-      weight: 0.14,
+      // Linear: salary ratio > 1 → strong signal
+      signal: Math.min((metrics.salaryRatio ?? metrics.monthlySpendRatio - 1) / 1.5, 1),
+      weight: 0.15,
     },
     {
       name: "Location Anomaly",
       signal: metrics.locationFlag ? 1 : 0,
-      weight: 0.16,
+      weight: 0.15,
     },
     {
       name: "Frequency Spike",
@@ -217,13 +232,13 @@ export function computeIsolationForestScore(metrics: DeviationMetrics): { score:
     },
     {
       name: "Time Pattern",
-      signal: metrics.transactionTimeRisk,    // already 0–1
+      signal: metrics.transactionTimeRisk,
       weight: 0.08,
     },
     {
       name: "Geo-Velocity",
       signal: metrics.geoVelocityFlag ? 1 : 0,
-      weight: 0.12,
+      weight: 0.10,
     },
     {
       name: "Device Change",
@@ -233,7 +248,7 @@ export function computeIsolationForestScore(metrics: DeviationMetrics): { score:
     {
       name: "Account Age",
       signal: metrics.accountAgeDays < 30 ? 1 : metrics.accountAgeDays < 90 ? 0.4 : 0,
-      weight: 0.06,
+      weight: 0.05,
     },
     {
       name: "Rapid Small Txns",
@@ -242,7 +257,6 @@ export function computeIsolationForestScore(metrics: DeviationMetrics): { score:
     },
   ];
 
-  // Weighted sum → 0–1 → scale to 0–100
   const contributions: Record<string, number> = {};
   let weightedSum = 0;
   for (const f of features) {
@@ -255,30 +269,20 @@ export function computeIsolationForestScore(metrics: DeviationMetrics): { score:
   return { score, contributions };
 }
 
-/** Smooth sigmoid activation: returns 0–1, centred at `mid` with steepness `k`. */
-function sigmoid(value: number, mid: number, k: number): number {
-  return 1 / (1 + Math.exp(-k * (value - mid)));
-}
-
 /**
- * Model 2: LightGBM (Supervised Risk Classifier)
- * Predicts fraud probability from known fraud patterns: beneficiary signals, payment links, device changes.
- * Output: fraud_probability (0–100)
+ * LightGBM — magnitude-aware scoring, not just binary thresholds.
  */
 export function computeLightGBMScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
   const contributions: Record<string, number> = {};
 
-  // Beneficiary risk
-  const beneficiaryContrib = Math.round(metrics.beneficiaryRiskScore * 0.3);
-  contributions["Beneficiary Risk"] = beneficiaryContrib;
+  // Beneficiary risk — scaled by magnitude
+  contributions["Beneficiary Risk"] = Math.round(metrics.beneficiaryRiskScore * 0.3);
 
   // First-time beneficiary
-  const firstTimeContrib = metrics.isFirstTimeBeneficiary ? 15 : 0;
-  contributions["First-Time Beneficiary"] = firstTimeContrib;
+  contributions["First-Time Beneficiary"] = metrics.isFirstTimeBeneficiary ? 15 : 0;
 
-  // UPI age risk
-  const upiAgeContrib = metrics.upiAgeDays < 7 ? 20 : metrics.upiAgeDays < 30 ? 10 : 0;
-  contributions["UPI Account Age"] = upiAgeContrib;
+  // UPI age risk — graduated
+  contributions["UPI Account Age"] = metrics.upiAgeDays < 7 ? 20 : metrics.upiAgeDays < 30 ? 10 : 0;
 
   // Payment link risk
   let linkContrib = 0;
@@ -288,20 +292,25 @@ export function computeLightGBMScore(metrics: DeviationMetrics): { score: number
   contributions["Payment Link Risk"] = linkContrib;
 
   // Device change
-  const deviceContrib = metrics.deviceChangeFlag ? 12 : 0;
-  contributions["Device Change"] = deviceContrib;
+  contributions["Device Change"] = metrics.deviceChangeFlag ? 12 : 0;
 
   // Night transaction
-  const nightContrib = metrics.isNightTransaction ? 8 : 0;
-  contributions["Night Transaction"] = nightContrib;
+  contributions["Night Transaction"] = metrics.isNightTransaction ? 8 : 0;
 
-  // Account age risk
-  const accountAgeContrib = metrics.accountAgeDays < 30 ? 10 : metrics.accountAgeDays < 90 ? 5 : 0;
-  contributions["Account Age"] = accountAgeContrib;
+  // Account age
+  contributions["Account Age"] = metrics.accountAgeDays < 30 ? 10 : metrics.accountAgeDays < 90 ? 5 : 0;
 
   // Historical fraud
-  const histContrib = metrics.historicalFraudExposureFlag ? 10 : 0;
-  contributions["Fraud History"] = histContrib;
+  contributions["Fraud History"] = metrics.historicalFraudExposureFlag ? 10 : 0;
+
+  // Amount-based fraud probability — NEW: scales with magnitude
+  const amountFraudSignal = Math.min(metrics.amountDeviation / 15, 1) * 15;
+  contributions["Amount Anomaly"] = Math.round(amountFraudSignal);
+
+  // Salary overrun signal — NEW
+  const salaryRatio = metrics.salaryRatio ?? 0;
+  const salarySignal = salaryRatio > 1 ? Math.min((salaryRatio - 1) / 2, 1) * 12 : 0;
+  contributions["Salary Overrun"] = Math.round(salarySignal);
 
   const raw = Object.values(contributions).reduce((a, b) => a + b, 0);
   const score = Math.min(Math.round(raw), 100);
@@ -326,7 +335,6 @@ export function computeMLScore(metrics: DeviationMetrics): {
 
   const mlReasons: string[] = [];
 
-  // Dynamic explanation based on actual per-feature contribution magnitude
   const allContribs = [
     ...Object.entries(iso.contributions).map(([k, v]) => ({ model: "Isolation Forest", feature: k, value: v, total: iso.score })),
     ...Object.entries(lgbm.contributions).map(([k, v]) => ({ model: "LightGBM", feature: k, value: v, total: lgbm.score })),
@@ -334,9 +342,7 @@ export function computeMLScore(metrics: DeviationMetrics): {
     .filter((c) => c.value > 3)
     .sort((a, b) => b.value - a.value);
 
-  // Only generate explanations when scores are meaningful
   if (mlScore >= 15) {
-    // Pick top contributors proportional to overall risk
     const maxReasons = mlScore >= 50 ? 4 : mlScore >= 30 ? 2 : 1;
     const seen = new Set<string>();
 
@@ -346,7 +352,6 @@ export function computeMLScore(metrics: DeviationMetrics): {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      // Generate description based on contribution intensity relative to model total
       const intensity = c.total > 0 ? c.value / c.total : 0;
       const qualifier = intensity > 0.4 ? "significant" : intensity > 0.2 ? "moderate" : "minor";
       mlReasons.push(`${c.feature} was a ${qualifier} factor in ${c.model} analysis (${c.value}/${c.total})`);
@@ -377,7 +382,7 @@ export function getRiskLevel(score: number): RiskLevel {
 }
 
 /**
- * Full scoring pipeline for transaction anomaly detection.
+ * Full scoring pipeline.
  */
 export function scoreTransaction(
   transactionId: string,
