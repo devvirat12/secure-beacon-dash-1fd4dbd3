@@ -55,9 +55,9 @@ const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
             {filtered.map((txn) => (
               <TableRow key={txn.id}>
                 <TableCell className="pl-6 text-xs">
-                  {new Date(txn.date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(txn.date).toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </TableCell>
-                <TableCell className="font-medium">${txn.amount.toLocaleString()}</TableCell>
+                <TableCell className="font-medium">₹{txn.amount.toLocaleString("en-IN")}</TableCell>
                 <TableCell className="text-xs">{txn.location}</TableCell>
                 <TableCell>
                   <span className={`text-sm font-semibold ${txn.riskScore >= 70 ? "text-danger" : txn.riskScore >= 50 ? "text-warning" : "text-safe"}`}>

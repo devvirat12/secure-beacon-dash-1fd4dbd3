@@ -4,30 +4,11 @@ import MetricCards from "@/components/MetricCards";
 import BehavioralDNA from "@/components/BehavioralDNA";
 import TransactionsTable from "@/components/TransactionsTable";
 import LiveTransactionStream from "@/components/LiveTransactionStream";
-import DetectionArchitecture from "@/components/DetectionArchitecture";
 import SimulationControls, { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
 import { useDemo } from "@/lib/demo-context";
 import { mockUser, mockTransactions, mockRiskTrend } from "@/lib/mock-data";
 import { Shield } from "lucide-react";
-
-const trustedDomains = ["razorpay", "paytm", "phonepe", "gpay", "bhim", "sbi", "hdfc", "icici", "axis"];
-
-function analyzeLinkDomain(link: string): { domain: string; risk: string; score: number } {
-  const lower = link.toLowerCase().trim();
-  if (!lower) return { domain: "", risk: "none", score: 0 };
-
-  // Extract domain-like part
-  const domainMatch = lower.replace(/https?:\/\//, "").split("/")[0].split("?")[0];
-  const domain = domainMatch || lower;
-
-  if (trustedDomains.some((d) => domain.includes(d))) {
-    return { domain, risk: "trusted", score: 0 };
-  }
-  if (domain.includes("bit.ly") || domain.includes("tinyurl") || domain.includes("shorturl")) {
-    return { domain, risk: "new", score: 20 };
-  }
-  return { domain, risk: "unknown", score: 15 };
-}
+import { Badge } from "@/components/ui/badge";
 
 const Index = () => {
   const { demoMode } = useDemo();
@@ -44,32 +25,26 @@ const Index = () => {
   });
   const [simTxnType, setSimTxnType] = useState<SimTransactionType>("normal");
 
-  const [testLink, setTestLink] = useState("");
-  const [linkResult, setLinkResult] = useState<{ domain: string; risk: string; score: number } | null>(null);
-
-  const handleTestLink = useCallback(() => {
-    if (testLink.trim()) {
-      setLinkResult(analyzeLinkDomain(testLink));
-    }
-  }, [testLink]);
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-7xl space-y-6 p-6">
-        <DetectionArchitecture />
+        {/* Detection badge only — no pipeline text */}
+        <div className="flex items-center">
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs px-3 py-1">
+            <Shield className="h-3 w-3 mr-1.5" />
+            Detection Layer Active – Hybrid Rule + ML
+          </Badge>
+        </div>
+
         <SimulationControls
           flags={simFlags}
           onFlagsChange={setSimFlags}
           simTxnType={simTxnType}
           onSimTxnTypeChange={setSimTxnType}
-          testLink={testLink}
-          onTestLinkChange={setTestLink}
-          linkResult={linkResult}
-          onTestLink={handleTestLink}
         />
         <MetricCards user={user} />
-        <LiveTransactionStream simulationFlags={simFlags} />
+        <LiveTransactionStream simulationFlags={simFlags} simTxnType={simTxnType} />
         <BehavioralDNA user={user} riskTrend={riskTrend} />
         <TransactionsTable transactions={transactions} />
       </main>

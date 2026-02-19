@@ -7,7 +7,7 @@ import { generateDatasetTransaction, getUserProfile, SimulationInjection } from 
 import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
-import { SimulationFlags } from "@/components/SimulationControls";
+import { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -20,8 +20,18 @@ const riskBadgeStyle = (level: RiskLevel) => {
 
 const riskLabels: Record<RiskLevel, string> = { SAFE: "Safe", WARNING: "Warning", HIGH_RISK: "High Risk" };
 
-function generateScoredTransaction(recentCountMap: Map<string, number>, injection?: SimulationInjection): LiveTransaction & { _scoring?: ScoringResult } {
-  const raw = generateDatasetTransaction(injection);
+const txnTypeLabels: Record<string, string> = {
+  standard: "Standard",
+  upi: "UPI",
+  payment_link: "Pay Link",
+};
+
+function generateScoredTransaction(
+  recentCountMap: Map<string, number>,
+  injection?: SimulationInjection,
+  txnType?: SimTransactionType
+): LiveTransaction & { _scoring?: ScoringResult; _txnType?: string } {
+  const raw = generateDatasetTransaction(injection, txnType);
   const user = raw._userRef;
   const recentCount = recentCountMap.get(user.userId) || 0;
 
@@ -31,6 +41,11 @@ function generateScoredTransaction(recentCountMap: Map<string, number>, injectio
   );
 
   recentCountMap.set(user.userId, recentCount + 1);
+
+  // Determine display type
+  let displayType = "standard";
+  if (raw.paymentLink) displayType = "payment_link";
+  else if (raw.upiId && !["bigbasket@razorpay", "swiggy@paytm", "flipkart@axl", "irctc@sbi", "apollo247@hdfcbank", "electricity.tneb@paytm", "zomato@ybl"].every(id => id !== raw.upiId)) displayType = "upi";
 
   return {
     id: raw.transactionId,
@@ -45,25 +60,30 @@ function generateScoredTransaction(recentCountMap: Map<string, number>, injectio
     status: scoring.riskScore >= 50 ? "Pending" : "Confirmed Legit",
     metrics: scoring.metrics,
     _scoring: scoring,
+    _txnType: displayType,
   };
 }
 
 interface LiveTransactionStreamProps {
   simulationFlags?: SimulationFlags;
+  simTxnType?: SimTransactionType;
 }
 
-const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) => {
-  const [transactions, setTransactions] = useState<(LiveTransaction & { _scoring?: ScoringResult })[]>([]);
+const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionStreamProps) => {
+  const [transactions, setTransactions] = useState<(LiveTransaction & { _scoring?: ScoringResult; _txnType?: string })[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedScoring, setSelectedScoring] = useState<ScoringResult | null>(null);
   const [selectedTxnId, setSelectedTxnId] = useState<string | null>(null);
-  const [selectedDetail, setSelectedDetail] = useState<(LiveTransaction & { _scoring?: ScoringResult }) | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<(LiveTransaction & { _scoring?: ScoringResult; _txnType?: string }) | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frequencyMap = useRef(new Map<string, number>());
   const { toast } = useToast();
 
   useEffect(() => {
-    const seed = Array.from({ length: 3 }, () => generateScoredTransaction(frequencyMap.current));
+    const types: SimTransactionType[] = ["normal", "upi", "payment_link"];
+    const seed = Array.from({ length: 3 }, (_, i) =>
+      generateScoredTransaction(frequencyMap.current, undefined, types[i % 3])
+    );
     setTransactions(seed);
   }, []);
 
@@ -72,11 +92,15 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
       const injection: SimulationInjection | undefined = simulationFlags && Object.values(simulationFlags).some(Boolean)
         ? simulationFlags
         : undefined;
-      const newTxn = generateScoredTransaction(frequencyMap.current, injection);
+
+      // Rotate transaction types naturally when no specific type forced
+      const effectiveType = simTxnType || (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
+
+      const newTxn = generateScoredTransaction(frequencyMap.current, injection, effectiveType);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
-  }, [simulationFlags]);
+  }, [simulationFlags, simTxnType]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -102,13 +126,8 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
           const histLen = user.transactionHistory.length;
           user.avgTransactionAmount = Math.round(((user.avgTransactionAmount * histLen) + txn.amount) / (histLen + 1));
           user.transactionHistory.push({
-            transactionId: txn.id,
-            userId: txn.userId,
-            amount: txn.amount,
-            timestamp: txn.date,
-            city: txn.location,
-            upiId: txn.upiId || "",
-            category: "Other",
+            transactionId: txn.id, userId: txn.userId, amount: txn.amount,
+            timestamp: txn.date, city: txn.location, upiId: txn.upiId || "", category: "Other",
           });
           if (txn.upiId && !user.usualUpiIds.includes(txn.upiId)) {
             user.usualUpiIds.push(txn.upiId);
@@ -167,10 +186,12 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
                     </div>
                     <div className="min-w-0 flex-1 grid grid-cols-5 gap-2 items-center text-xs">
                       <span className="text-muted-foreground font-mono truncate">{txn.id}</span>
-                      <span className="text-muted-foreground">{txn.userId}</span>
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 w-fit">
+                        {txnTypeLabels[(txn as any)._txnType] || "Standard"}
+                      </Badge>
                       <span className="font-medium text-foreground">₹{txn.amount.toLocaleString("en-IN")}</span>
                       <span className="text-muted-foreground truncate">{txn.location}</span>
-                      <span className="text-muted-foreground truncate">{txn.upiId}</span>
+                      <span className="text-muted-foreground truncate">{txn.upiId || "—"}</span>
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       <span className={`text-xs font-semibold ${txn.riskScore >= 70 ? "text-danger" : txn.riskScore >= 50 ? "text-warning" : "text-safe"}`}>
@@ -231,7 +252,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
                     {[
                       { label: "Amount Deviation", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
                       { label: "City Anomaly", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
-                      { label: "Salary Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
+                      { label: "Monthly Spend Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
                       { label: "Frequency Spike", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
                       { label: "Night Transaction", flag: selectedDetail._scoring.metrics.isNightTransaction, value: selectedDetail._scoring.metrics.isNightTransaction ? "2AM–5AM" : "OK" },
                     ].map((rule) => (
@@ -253,7 +274,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
                   </div>
                   <div className="space-y-1.5">
                     {[
-                      { label: "UPI ID Age", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d` },
+                      { label: "Beneficiary Age", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d` },
                       { label: "First-Time Beneficiary", icon: UserX, flag: selectedDetail._scoring.metrics.isFirstTimeBeneficiary, value: selectedDetail._scoring.metrics.isFirstTimeBeneficiary ? "YES" : "NO" },
                       { label: "Payment Link", icon: Link2, flag: selectedDetail._scoring.metrics.isPaymentLink, value: selectedDetail._scoring.metrics.isPaymentLink ? selectedDetail._scoring.metrics.linkRisk.toUpperCase() : "NONE" },
                     ].map((item) => (
