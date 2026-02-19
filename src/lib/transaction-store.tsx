@@ -1,64 +1,26 @@
-import { useSyncExternalStore, useCallback, ReactNode } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
 import { Transaction } from "@/lib/types";
 
 /**
- * Window-level singleton stores — guaranteed to survive HMR and module duplication.
+ * Bulletproof global store using window + CustomEvent.
+ * Cannot be broken by HMR, module duplication, or context issues.
  */
-type Listener = () => void;
 
-class TransactionStore<T extends Transaction> {
-  private items: T[] = [];
-  private listeners = new Set<Listener>();
-  private maxItems: number;
+const LIVE_EVENT = "live-txn-changed";
+const REVIEWED_EVENT = "reviewed-txn-changed";
 
-  constructor(maxItems: number) {
-    this.maxItems = maxItems;
-  }
-
-  getSnapshot = (): T[] => this.items;
-
-  add(item: T) {
-    if (this.items.some((t) => t.id === item.id)) return;
-    this.items = [item, ...this.items].slice(0, this.maxItems);
-    console.log(`[TransactionStore] Added ${item.id}, total: ${this.items.length}`, item);
-    this.emit();
-  }
-
-  updateStatus(id: string, status: Transaction["status"]) {
-    this.items = this.items.map((t) => (t.id === id ? { ...t, status } : t));
-    console.log(`[TransactionStore] Updated ${id} → ${status}`);
-    this.emit();
-  }
-
-  subscribe = (listener: Listener): (() => void) => {
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
-  };
-
-  private emit() {
-    this.listeners.forEach((l) => l());
-  }
-}
-
-// Window-level singletons — cannot be duplicated by Vite HMR
 declare global {
   interface Window {
-    __liveStore?: TransactionStore<Transaction & { _scoring?: any; _txnType?: string }>;
-    __reviewedStore?: TransactionStore<Transaction>;
+    __liveTxns: (Transaction & { _scoring?: any; _txnType?: string })[];
+    __reviewedTxns: Transaction[];
   }
 }
 
-if (!window.__liveStore) {
-  window.__liveStore = new TransactionStore<Transaction & { _scoring?: any; _txnType?: string }>(50);
-}
-if (!window.__reviewedStore) {
-  window.__reviewedStore = new TransactionStore<Transaction>(100);
-}
+// Initialize once
+if (!window.__liveTxns) window.__liveTxns = [];
+if (!window.__reviewedTxns) window.__reviewedTxns = [];
 
-const liveStore = window.__liveStore;
-const reviewedStore = window.__reviewedStore;
-
-// ── Providers (no-op wrappers for API compatibility) ──
+// ── Providers (no-op, kept for API compat) ──
 
 export function LiveTransactionStoreProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
@@ -68,19 +30,62 @@ export function ReviewedTransactionStoreProvider({ children }: { children: React
   return <>{children}</>;
 }
 
-// ── Hooks ──
+// ── Live Transaction Store ──
 
 export function useLiveTransactionStore() {
-  const liveTransactions = useSyncExternalStore(liveStore.subscribe, liveStore.getSnapshot);
-  const addLiveTransaction = useCallback((txn: Transaction & { _scoring?: any; _txnType?: string }) => liveStore.add(txn), []);
-  const updateLiveStatus = useCallback((id: string, status: Transaction["status"]) => liveStore.updateStatus(id, status), []);
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const handler = () => forceUpdate((n) => n + 1);
+    window.addEventListener(LIVE_EVENT, handler);
+    return () => window.removeEventListener(LIVE_EVENT, handler);
+  }, []);
+
+  const liveTransactions = window.__liveTxns;
+
+  const addLiveTransaction = useCallback((txn: Transaction & { _scoring?: any; _txnType?: string }) => {
+    if (window.__liveTxns.some((t) => t.id === txn.id)) return;
+    window.__liveTxns = [txn, ...window.__liveTxns].slice(0, 50);
+    console.log(`[LiveStore] Added ${txn.id}, total: ${window.__liveTxns.length}`);
+    window.dispatchEvent(new CustomEvent(LIVE_EVENT));
+  }, []);
+
+  const updateLiveStatus = useCallback((id: string, status: Transaction["status"]) => {
+    window.__liveTxns = window.__liveTxns.map((t) => (t.id === id ? { ...t, status } : t));
+    window.dispatchEvent(new CustomEvent(LIVE_EVENT));
+  }, []);
+
   return { liveTransactions, addLiveTransaction, updateLiveStatus };
 }
 
+// ── Reviewed Transaction Store ──
+
 export function useReviewedTransactionStore() {
-  const reviewedTransactions = useSyncExternalStore(reviewedStore.subscribe, reviewedStore.getSnapshot);
-  const addReviewedTransaction = useCallback((txn: Transaction) => reviewedStore.add(txn), []);
-  const updateReviewedStatus = useCallback((id: string, status: Transaction["status"]) => reviewedStore.updateStatus(id, status), []);
-  console.log("[useReviewedTransactionStore] current count:", reviewedTransactions.length);
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const handler = () => {
+      console.log("[ReviewedStore] Event received, forcing re-render. Count:", window.__reviewedTxns.length);
+      forceUpdate((n) => n + 1);
+    };
+    window.addEventListener(REVIEWED_EVENT, handler);
+    return () => window.removeEventListener(REVIEWED_EVENT, handler);
+  }, []);
+
+  const reviewedTransactions = window.__reviewedTxns;
+
+  const addReviewedTransaction = useCallback((txn: Transaction) => {
+    if (window.__reviewedTxns.some((t) => t.id === txn.id)) return;
+    window.__reviewedTxns = [txn, ...window.__reviewedTxns].slice(0, 100);
+    console.log(`[ReviewedStore] Added ${txn.id}, total: ${window.__reviewedTxns.length}`, txn);
+    window.dispatchEvent(new CustomEvent(REVIEWED_EVENT));
+  }, []);
+
+  const updateReviewedStatus = useCallback((id: string, status: Transaction["status"]) => {
+    window.__reviewedTxns = window.__reviewedTxns.map((t) => (t.id === id ? { ...t, status } : t));
+    console.log(`[ReviewedStore] Updated ${id} → ${status}`);
+    window.dispatchEvent(new CustomEvent(REVIEWED_EVENT));
+  }, []);
+
   return { reviewedTransactions, addReviewedTransaction, updateReviewedStatus };
 }

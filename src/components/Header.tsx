@@ -2,7 +2,7 @@ import { Shield, BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useDemo } from "@/lib/demo-context";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 
 const Header = () => {
   const { demoMode, setDemoMode } = useDemo();
@@ -22,19 +22,19 @@ const Header = () => {
         </div>
 
         <nav className="flex items-center gap-6">
-          <a
-            href="/"
+          <Link
+            to="/"
             className={`text-sm font-medium transition-colors hover:text-primary ${location.pathname === "/" ? "text-primary" : "text-muted-foreground"}`}
           >
             Dashboard
-          </a>
-          <a
-            href="/simulate"
+          </Link>
+          <Link
+            to="/simulate"
             className={`flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-primary ${location.pathname === "/simulate" ? "text-primary" : "text-muted-foreground"}`}
           >
             <BarChart3 className="h-3.5 w-3.5" />
             Simulate
-          </a>
+          </Link>
 
           <div className="ml-4 flex items-center gap-2 rounded-lg glass-card-light px-3 py-1.5">
             <Label htmlFor="demo-mode" className="text-xs text-muted-foreground cursor-pointer">Demo</Label>
