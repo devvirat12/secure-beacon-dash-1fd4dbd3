@@ -45,7 +45,7 @@ export interface RiskTrendPoint {
 
 export interface UpiIdInfo {
   upiId: string;
-  creationDate: string; // ISO date
+  creationDate: string;
   ageDays: number;
 }
 
@@ -70,6 +70,11 @@ export interface DatasetUser {
   usualCities: string[];
   usualUpiIds: string[];
   transactionHistory: HistoricalTransaction[];
+  // Enhanced features
+  accountAgeDays: number;
+  deviceFingerprints: string[];
+  historicalFraudCount: number;
+  profileType: "salaried" | "business" | "student" | "high_spender" | "low_spender";
 }
 
 export interface DeviationMetrics {
@@ -83,10 +88,21 @@ export interface DeviationMetrics {
   isPaymentLink: boolean;
   linkRisk: "trusted" | "unknown" | "new" | "none";
   isNightTransaction: boolean;
+  // Enhanced features
+  deviceChangeFlag: boolean;
+  rapidSmallTransactionsFlag: boolean;
+  geoVelocityFlag: boolean;
+  beneficiaryRiskScore: number;
+  accountAgeDays: number;
+  transactionTimeRisk: number;
+  historicalFraudExposureFlag: boolean;
 }
 
 export interface ScoringResult extends AnalysisResult {
   metrics: DeviationMetrics;
+  // Enhanced ML breakdown
+  anomalyScore: number;
+  fraudProbability: number;
 }
 
 export interface LiveTransaction extends Transaction {

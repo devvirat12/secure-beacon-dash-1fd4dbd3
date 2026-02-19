@@ -12,6 +12,7 @@ function classifyLinkRisk(link?: string): "trusted" | "unknown" | "new" | "none"
 
 /**
  * Compute behavioral deviation metrics for a transaction against a user's profile.
+ * Now includes enhanced features: device change, geo-velocity, rapid small txns, etc.
  */
 export function computeDeviations(
   amount: number,
@@ -21,7 +22,10 @@ export function computeDeviations(
   user: DatasetUser,
   recentTxnCountLastHour: number = 0,
   paymentLink?: string,
-  timestamp?: string
+  timestamp?: string,
+  deviceId?: string,
+  previousCity?: string,
+  previousTimestamp?: string
 ): DeviationMetrics {
   const amountDeviation = user.avgTransactionAmount > 0 ? amount / user.avgTransactionAmount : 0;
   const monthlySpendRatio = user.avgMonthlySpend > 0 ? (user.avgMonthlySpend + amount) / user.avgMonthlySpend : 0;
@@ -45,11 +49,47 @@ export function computeDeviations(
 
   // Night transaction check (2AM - 5AM IST)
   let isNightTransaction = false;
+  let transactionTimeRisk = 0;
   if (timestamp) {
     const hour = new Date(timestamp).getUTCHours();
     const istHour = (hour + 5) % 24;
     isNightTransaction = istHour >= 2 && istHour < 5;
+    // Time-based risk: higher risk for late night / early morning
+    if (istHour >= 0 && istHour < 6) transactionTimeRisk = 0.8;
+    else if (istHour >= 22) transactionTimeRisk = 0.5;
+    else transactionTimeRisk = 0.1;
   }
+
+  // Device change detection
+  const deviceChangeFlag = deviceId ? !user.deviceFingerprints.includes(deviceId) : false;
+
+  // Rapid small transactions (>3 txns under ₹500 in last hour)
+  const rapidSmallTransactionsFlag = amount < 500 && recentTxnCountLastHour >= 3;
+
+  // Geo-velocity: impossible travel detection
+  let geoVelocityFlag = false;
+  if (previousCity && previousTimestamp && timestamp) {
+    const timeDiffMs = new Date(timestamp).getTime() - new Date(previousTimestamp).getTime();
+    const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
+    const citiesAreDifferent = previousCity.toLowerCase() !== city.toLowerCase();
+    // If different city within 1 hour → impossible travel
+    if (citiesAreDifferent && timeDiffHours < 1 && timeDiffHours > 0) {
+      geoVelocityFlag = true;
+    }
+  }
+
+  // Beneficiary risk score: composite of UPI age, first-time, and known suspicious patterns
+  let beneficiaryRiskScore = 0;
+  if (isFirstTimeBeneficiary) beneficiaryRiskScore += 30;
+  if (upiAgeDays < 7) beneficiaryRiskScore += 40;
+  else if (upiAgeDays < 30) beneficiaryRiskScore += 20;
+  if (upiId.includes("cash") || upiId.includes("earn") || upiId.includes("lucky") || upiId.includes("winner") || upiId.includes("refund") || upiId.includes("invest")) {
+    beneficiaryRiskScore += 30;
+  }
+  beneficiaryRiskScore = Math.min(beneficiaryRiskScore, 100);
+
+  // Historical fraud exposure
+  const historicalFraudExposureFlag = user.historicalFraudCount > 0;
 
   return {
     amountDeviation,
@@ -62,6 +102,13 @@ export function computeDeviations(
     isPaymentLink,
     linkRisk,
     isNightTransaction,
+    deviceChangeFlag,
+    rapidSmallTransactionsFlag,
+    geoVelocityFlag,
+    beneficiaryRiskScore,
+    accountAgeDays: user.accountAgeDays,
+    transactionTimeRisk,
+    historicalFraudExposureFlag,
   };
 }
 
@@ -108,51 +155,158 @@ export function computeRuleScore(
     reasons.push("Transaction initiated between 2AM–5AM IST (unusual hours)");
   }
 
+  // Rule 6: Device change
+  if (metrics.deviceChangeFlag) {
+    ruleScore += 10;
+    reasons.push("Transaction from unrecognized device");
+  }
+
+  // Rule 7: Geo-velocity (impossible travel)
+  if (metrics.geoVelocityFlag) {
+    ruleScore += 20;
+    reasons.push("Impossible travel detected: different city within 1 hour");
+  }
+
+  // Rule 8: Rapid small transactions
+  if (metrics.rapidSmallTransactionsFlag) {
+    ruleScore += 10;
+    reasons.push("Rapid small transactions detected (potential card testing)");
+  }
+
+  // Rule 9: Historical fraud exposure
+  if (metrics.historicalFraudExposureFlag) {
+    ruleScore += 5;
+    reasons.push("User has prior fraud exposure history");
+  }
+
   return { ruleScore: Math.min(ruleScore, 100), reasons };
 }
 
 /**
- * Multi-model ML scoring pipeline:
- *   Model 1: Isolation Forest — anomaly detection on amount/location
- *   Model 2: Logistic Regression — fraud probability from beneficiary signals
- *   Model 3: Gradient Boosting — behavioral risk weighting from payment link & context
- *
- * Outputs are normalized and combined into a single ML score.
+ * Model 1: Isolation Forest — Unsupervised anomaly detection
+ * Detects statistical outliers based on amount, location, and behavioral deviations.
+ * Output: anomaly_score (0–100)
  */
-export function computeMLScore(metrics: DeviationMetrics): { mlScore: number; mlReasons: string[] } {
+export function computeIsolationForestScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
+  const contributions: Record<string, number> = {};
+
+  // Amount anomaly
+  const amountAnomaly = Math.min(metrics.amountDeviation * 8, 30);
+  contributions["Amount Deviation"] = Math.round(amountAnomaly);
+
+  // Location anomaly
+  const locationAnomaly = metrics.locationFlag ? 15 : 0;
+  contributions["Location Anomaly"] = locationAnomaly;
+
+  // Frequency anomaly
+  const freqAnomaly = metrics.frequencySpike ? 10 : 0;
+  contributions["Frequency Anomaly"] = freqAnomaly;
+
+  // Time anomaly
+  const timeAnomaly = Math.round(metrics.transactionTimeRisk * 15);
+  contributions["Time Pattern Anomaly"] = timeAnomaly;
+
+  // Geo-velocity anomaly
+  const geoAnomaly = metrics.geoVelocityFlag ? 15 : 0;
+  contributions["Geo-Velocity Anomaly"] = geoAnomaly;
+
+  // Rapid small txns
+  const rapidAnomaly = metrics.rapidSmallTransactionsFlag ? 10 : 0;
+  contributions["Rapid Small Txns"] = rapidAnomaly;
+
+  // Spend ratio anomaly
+  const spendAnomaly = metrics.monthlySpendRatio > 1.5 ? Math.min(Math.round((metrics.monthlySpendRatio - 1) * 10), 15) : 0;
+  contributions["Spend Ratio Anomaly"] = spendAnomaly;
+
+  const raw = Object.values(contributions).reduce((a, b) => a + b, 0);
+  const score = Math.min(Math.round(raw), 100);
+  return { score, contributions };
+}
+
+/**
+ * Model 2: LightGBM (Supervised Risk Classifier)
+ * Predicts fraud probability from known fraud patterns: beneficiary signals, payment links, device changes.
+ * Output: fraud_probability (0–100)
+ */
+export function computeLightGBMScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
+  const contributions: Record<string, number> = {};
+
+  // Beneficiary risk
+  const beneficiaryContrib = Math.round(metrics.beneficiaryRiskScore * 0.3);
+  contributions["Beneficiary Risk"] = beneficiaryContrib;
+
+  // First-time beneficiary
+  const firstTimeContrib = metrics.isFirstTimeBeneficiary ? 15 : 0;
+  contributions["First-Time Beneficiary"] = firstTimeContrib;
+
+  // UPI age risk
+  const upiAgeContrib = metrics.upiAgeDays < 7 ? 20 : metrics.upiAgeDays < 30 ? 10 : 0;
+  contributions["UPI Account Age"] = upiAgeContrib;
+
+  // Payment link risk
+  let linkContrib = 0;
+  if (metrics.isPaymentLink) {
+    linkContrib = metrics.linkRisk === "new" ? 20 : metrics.linkRisk === "unknown" ? 15 : 3;
+  }
+  contributions["Payment Link Risk"] = linkContrib;
+
+  // Device change
+  const deviceContrib = metrics.deviceChangeFlag ? 12 : 0;
+  contributions["Device Change"] = deviceContrib;
+
+  // Night transaction
+  const nightContrib = metrics.isNightTransaction ? 8 : 0;
+  contributions["Night Transaction"] = nightContrib;
+
+  // Account age risk
+  const accountAgeContrib = metrics.accountAgeDays < 30 ? 10 : metrics.accountAgeDays < 90 ? 5 : 0;
+  contributions["Account Age"] = accountAgeContrib;
+
+  // Historical fraud
+  const histContrib = metrics.historicalFraudExposureFlag ? 10 : 0;
+  contributions["Fraud History"] = histContrib;
+
+  const raw = Object.values(contributions).reduce((a, b) => a + b, 0);
+  const score = Math.min(Math.round(raw), 100);
+  return { score, contributions };
+}
+
+/**
+ * Combined ML score: 50% Isolation Forest + 50% LightGBM
+ */
+export function computeMLScore(metrics: DeviationMetrics): {
+  mlScore: number;
+  anomalyScore: number;
+  fraudProbability: number;
+  mlReasons: string[];
+  isoContributions: Record<string, number>;
+  lgbmContributions: Record<string, number>;
+} {
+  const iso = computeIsolationForestScore(metrics);
+  const lgbm = computeLightGBMScore(metrics);
+
+  const mlScore = Math.round(iso.score * 0.5 + lgbm.score * 0.5);
+
   const mlReasons: string[] = [];
 
-  // Model 1: Isolation Forest — amount deviation & location anomaly
-  const isoForestAmountScore = Math.min(metrics.amountDeviation * 10, 25);
-  const isoForestLocationScore = metrics.locationFlag ? 10 : 0;
-  const isolationForestScore = Math.min(isoForestAmountScore + isoForestLocationScore, 30);
+  // Generate reasons from top contributors
+  const allContribs = [
+    ...Object.entries(iso.contributions).map(([k, v]) => ({ source: "Isolation Forest", label: k, value: v })),
+    ...Object.entries(lgbm.contributions).map(([k, v]) => ({ source: "LightGBM", label: k, value: v })),
+  ].filter((c) => c.value > 0).sort((a, b) => b.value - a.value);
 
-  // Model 2: Logistic Regression — beneficiary fraud probability
-  const beneficiaryScore = metrics.isFirstTimeBeneficiary ? 20 : 0;
-  const upiAgeScore = metrics.upiAgeDays < 7 ? 20 : metrics.upiAgeDays < 30 ? 10 : 0;
-  const logisticRegressionScore = Math.min(beneficiaryScore + upiAgeScore, 35);
-
-  if (metrics.isFirstTimeBeneficiary) mlReasons.push("[Logistic Regression] First-time transfer to this beneficiary");
-  if (metrics.upiAgeDays < 7) mlReasons.push(`[Isolation Forest] Beneficiary account created only ${metrics.upiAgeDays} days ago (potential mule)`);
-  else if (metrics.upiAgeDays < 30) mlReasons.push(`[Isolation Forest] Beneficiary account is ${metrics.upiAgeDays} days old (recently created)`);
-
-  // Model 3: Gradient Boosting — payment link & contextual risk
-  let gradientBoostingScore = 0;
-  if (metrics.isPaymentLink) {
-    gradientBoostingScore = metrics.linkRisk === "new" ? 25 : metrics.linkRisk === "unknown" ? 20 : 5;
-    const riskLabel = metrics.linkRisk === "new" ? "suspicious shortened" : metrics.linkRisk === "unknown" ? "unknown domain" : "trusted";
-    mlReasons.push(`[Gradient Boosting] Payment initiated via ${riskLabel} link`);
+  for (const c of allContribs.slice(0, 5)) {
+    mlReasons.push(`[${c.source}] ${c.label}: +${c.value} pts`);
   }
-  if (metrics.isNightTransaction) {
-    gradientBoostingScore += 10;
-    mlReasons.push("[Gradient Boosting] Night-time transaction pattern detected");
-  }
-  gradientBoostingScore = Math.min(gradientBoostingScore, 35);
 
-  // Combine: normalize to 0-100
-  const rawMl = isolationForestScore + logisticRegressionScore + gradientBoostingScore;
-  const mlScore = Math.round(Math.min(rawMl, 100));
-  return { mlScore, mlReasons };
+  return {
+    mlScore,
+    anomalyScore: iso.score,
+    fraudProbability: lgbm.score,
+    mlReasons,
+    isoContributions: iso.contributions,
+    lgbmContributions: lgbm.contributions,
+  };
 }
 
 /**
@@ -180,11 +334,14 @@ export function scoreTransaction(
   user: DatasetUser,
   recentTxnCountLastHour: number = 0,
   paymentLink?: string,
-  timestamp?: string
+  timestamp?: string,
+  deviceId?: string,
+  previousCity?: string,
+  previousTimestamp?: string
 ): ScoringResult {
-  const metrics = computeDeviations(amount, city, upiId, upiInfo, user, recentTxnCountLastHour, paymentLink, timestamp);
+  const metrics = computeDeviations(amount, city, upiId, upiInfo, user, recentTxnCountLastHour, paymentLink, timestamp, deviceId, previousCity, previousTimestamp);
   const { ruleScore, reasons } = computeRuleScore(amount, user, metrics);
-  const { mlScore, mlReasons } = computeMLScore(metrics);
+  const { mlScore, anomalyScore, fraudProbability, mlReasons } = computeMLScore(metrics);
   const finalScore = computeFinalScore(ruleScore, mlScore);
   const riskLevel = getRiskLevel(finalScore);
 
@@ -199,6 +356,8 @@ export function scoreTransaction(
     riskLevel,
     ruleScore,
     mlScore,
+    anomalyScore,
+    fraudProbability,
     behavioralScore: Math.round((ruleScore + mlScore) / 2),
     reasons: allReasons,
     action: finalScore >= 50 ? "CONFIRMATION_REQUIRED" : "ALLOW",
