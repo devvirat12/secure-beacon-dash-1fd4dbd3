@@ -125,22 +125,26 @@ export function computeRuleScore(
 
   // Rule 1: Amount deviation > 3x
   if (metrics.amountDeviation > 3) {
-    const points = Math.min(Math.round(metrics.amountDeviation * 5), 25);
+    const cappedDev = Math.min(metrics.amountDeviation, 50);
+    const points = Math.min(Math.round(cappedDev * 5), 25);
     ruleScore += points;
-    reasons.push(`Transaction ${metrics.amountDeviation.toFixed(1)}x higher than user average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
+    if (cappedDev > 10) {
+      reasons.push(`Transaction significantly higher than user's historical average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
+    } else {
+      reasons.push(`Transaction ${cappedDev.toFixed(1)}x above user's average (₹${user.avgTransactionAmount.toLocaleString("en-IN")})`);
+    }
   }
 
   // Rule 2: City anomaly
   if (metrics.locationFlag) {
     ruleScore += 20;
-    reasons.push(`City not in user's usual locations (${user.usualCities.join(", ")})`);
+    reasons.push(`Transaction from unfamiliar location — outside usual cities`);
   }
 
   // Rule 3: Amount > 60% monthly salary
   if (amount > user.monthlySalary * 0.6) {
-    const pct = Math.round((amount / user.monthlySalary) * 100);
     ruleScore += 25;
-    reasons.push(`Amount equals ${pct}% of monthly salary (₹${user.monthlySalary.toLocaleString("en-IN")})`);
+    reasons.push(`Transaction exceeds typical monthly salary range`);
   }
 
   // Rule 4: Frequency spike

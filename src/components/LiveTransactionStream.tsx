@@ -220,19 +220,15 @@ const LiveTransactionStream = () => {
                     {riskLabels[selectedDetail.riskLevel]}
                   </Badge>
 
-                  <div className="rounded-lg bg-secondary/50 p-2 space-y-0.5">
-                    <p className="text-[10px] text-muted-foreground text-center font-mono">
-                      ML = (IsoForest × 0.5) + (LightGBM × 0.5)
-                    </p>
-                    <p className="text-[10px] text-muted-foreground text-center font-mono">
-                      = ({selectedDetail._scoring.anomalyScore || 0} × 0.5) + ({selectedDetail._scoring.fraudProbability || 0} × 0.5) = <span className="font-bold text-foreground">{selectedDetail._scoring.mlScore}</span>
-                    </p>
-                    <p className="text-[10px] text-muted-foreground text-center font-mono mt-1">
-                      Final = (Rule × 0.6) + (ML × 0.4)
-                    </p>
-                    <p className="text-[10px] text-muted-foreground text-center font-mono">
-                      = ({selectedDetail._scoring.ruleScore} × 0.6) + ({selectedDetail._scoring.mlScore} × 0.4) = <span className="font-bold text-foreground">{selectedDetail.riskScore}</span>
-                    </p>
+                  <div className="rounded-lg bg-secondary/50 p-2 space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Rule Score</span>
+                      <span className="font-semibold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">ML Score</span>
+                      <span className="font-semibold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
+                    </div>
                   </div>
                 </div>
 
