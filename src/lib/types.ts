@@ -34,6 +34,7 @@ export interface AnalysisResult {
   behavioralScore: number;
   reasons: string[];
   action: "ALLOW" | "CONFIRMATION_REQUIRED" | "BLOCK";
+  confidenceScore?: number;
 }
 
 export interface RiskTrendPoint {
@@ -97,6 +98,22 @@ export interface DeviationMetrics {
   transactionTimeRisk: number;
   historicalFraudExposureFlag: boolean;
   salaryRatio: number;
+  // New features
+  behavioralDriftScore: number;
+  linkRiskScore: number;
+  linkDeepInspection?: LinkDeepInspection;
+  previousCity?: string;
+  previousTimestamp?: string;
+}
+
+export interface LinkDeepInspection {
+  domain: string;
+  isShortened: boolean;
+  hasSuspiciousKeywords: boolean;
+  lookalikeSimilarity: number;
+  lookalikeDomain?: string;
+  domainAgeSimDays: number;
+  linkRiskScore: number;
 }
 
 export interface ScoringResult extends AnalysisResult {
@@ -104,6 +121,7 @@ export interface ScoringResult extends AnalysisResult {
   // Enhanced ML breakdown
   anomalyScore: number;
   fraudProbability: number;
+  confidenceScore: number;
 }
 
 export interface LiveTransaction extends Transaction {
