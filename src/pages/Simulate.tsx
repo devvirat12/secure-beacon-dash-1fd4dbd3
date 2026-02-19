@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Send, AlertCircle, Link2, Globe, Shield, UserCheck } from "lucide-react";
 import { AnalysisResult, RiskLevel, ScoringResult } from "@/lib/types";
 import { useDemo } from "@/lib/demo-context";
@@ -78,9 +79,9 @@ const Simulate = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  // ── Receiver Intelligence Fields (minimal, additive) ──────────────────────
+  // ── Receiver Intelligence Fields ──────────────────────────────────────────
   const [receiverId, setReceiverId] = useState("");
-  const [transactionId, setTransactionId] = useState("");
+  const [isNewBeneficiary, setIsNewBeneficiary] = useState(false);
 
   const simFlags = {
     highAmount: true,
@@ -117,9 +118,8 @@ const Simulate = () => {
           amount: parseFloat(amount),
           location: city,
           timestamp: new Date().toISOString(),
-          // ── Receiver intelligence fields (minimal, non-breaking) ──
           ...(receiverId && { receiverId }),
-          ...(transactionId && { transactionId }),
+          ...(isNewBeneficiary && { isNewBeneficiary }),
         });
         // Capture optional receiver fields from API response
         setReceiverApiData({
@@ -271,21 +271,21 @@ const Simulate = () => {
                 </Select>
               </div>
 
-              {/* ── Receiver Intelligence Fields (minimal, additive) ──────── */}
+              {/* ── Receiver Intelligence Fields ──────────────────────────── */}
               <div className="sm:col-span-2 pt-3 border-t border-border">
                 <div className="flex items-center gap-1.5 mb-3">
                   <UserCheck className="h-3.5 w-3.5 text-primary" />
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Receiver Intelligence</span>
                   <span className="text-[10px] text-muted-foreground ml-0.5">(optional)</span>
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 items-end">
                   <div className="space-y-1.5">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Receiver ID</Label>
-                    <Input placeholder="e.g. RCV-001" value={receiverId} onChange={(e) => setReceiverId(e.target.value)} className="bg-secondary/30 border-border h-9 text-sm" />
+                    <Label className="text-[11px] font-medium text-muted-foreground">Receiver ID (UPI / Account)</Label>
+                    <Input placeholder="e.g. RCV-001 or user@upi" value={receiverId} onChange={(e) => setReceiverId(e.target.value)} className="bg-secondary/30 border-border h-9 text-sm" />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] font-medium text-muted-foreground">Transaction ID</Label>
-                    <Input placeholder="e.g. TXN-20260219" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="bg-secondary/30 border-border h-9 text-sm" />
+                  <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 px-3 h-9">
+                    <Switch id="new-beneficiary" checked={isNewBeneficiary} onCheckedChange={setIsNewBeneficiary} />
+                    <Label htmlFor="new-beneficiary" className="text-[11px] font-medium text-muted-foreground cursor-pointer select-none">New Beneficiary?</Label>
                   </div>
                 </div>
               </div>
