@@ -7,6 +7,7 @@ import { DemoProvider } from "@/lib/demo-context";
 import { LiveTransactionStoreProvider, ReviewedTransactionStoreProvider } from "@/lib/transaction-store";
 import Index from "./pages/Index";
 import Simulate from "./pages/Simulate";
+import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/simulate" element={<Simulate />} />
+                <Route path="/landing" element={<Landing />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
