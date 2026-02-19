@@ -1,12 +1,13 @@
 export interface UserProfile {
   userId: string;
-  monthlyIncome: number;
+  name: string;
+  monthlySalary: number;
   avgTransactionAmount: number;
   avgMonthlySpend: number;
   weeklyTransactionFrequency: number;
-  usualLocations: string[];
+  usualCities: string[];
   typicalSpendingRange: { min: number; max: number };
-  mostFrequentLocation: string;
+  mostFrequentCity: string;
   normalSpendingHours: string;
   incomeVsSpendRatio: number;
 }
@@ -40,24 +41,34 @@ export interface RiskTrendPoint {
   score: number;
 }
 
-// --- Dataset-driven types ---
+// --- Indian UPI Dataset Types ---
+
+export interface UpiIdInfo {
+  upiId: string;
+  creationDate: string; // ISO date
+  ageDays: number;
+}
 
 export interface HistoricalTransaction {
   transactionId: string;
   userId: string;
   amount: number;
   timestamp: string;
-  location: string;
+  city: string;
+  upiId: string;
   category: string;
+  paymentLink?: string;
 }
 
 export interface DatasetUser {
   userId: string;
-  monthlyIncome: number;
+  name: string;
+  monthlySalary: number;
   avgTransactionAmount: number;
   avgMonthlySpend: number;
   avgWeeklyFrequency: number;
-  usualLocations: string[];
+  usualCities: string[];
+  usualUpiIds: string[];
   transactionHistory: HistoricalTransaction[];
 }
 
@@ -66,6 +77,12 @@ export interface DeviationMetrics {
   monthlySpendRatio: number;
   locationFlag: boolean;
   frequencySpike: boolean;
+  isFirstTimeBeneficiary: boolean;
+  upiAgeDays: number;
+  upiAgeFlag: boolean;
+  isPaymentLink: boolean;
+  linkRisk: "trusted" | "unknown" | "new" | "none";
+  isNightTransaction: boolean;
 }
 
 export interface ScoringResult extends AnalysisResult {
@@ -74,5 +91,7 @@ export interface ScoringResult extends AnalysisResult {
 
 export interface LiveTransaction extends Transaction {
   userId: string;
+  upiId?: string;
+  paymentLink?: string;
   metrics?: DeviationMetrics;
 }

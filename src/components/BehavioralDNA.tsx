@@ -10,10 +10,10 @@ interface BehavioralDNAProps {
 
 const BehavioralDNA = ({ user, riskTrend }: BehavioralDNAProps) => {
   const insights = [
-    { label: "Typical Spending Range", value: `$${user.typicalSpendingRange.min} – $${user.typicalSpendingRange.max}`, icon: Brain },
-    { label: "Most Frequent Location", value: user.mostFrequentLocation, icon: MapPin },
+    { label: "Typical Spending Range", value: `₹${user.typicalSpendingRange.min.toLocaleString("en-IN")} – ₹${user.typicalSpendingRange.max.toLocaleString("en-IN")}`, icon: Brain },
+    { label: "Most Frequent City", value: user.mostFrequentCity, icon: MapPin },
     { label: "Normal Spending Hours", value: user.normalSpendingHours, icon: Clock },
-    { label: "Income vs Spend Ratio", value: `${Math.round(user.incomeVsSpendRatio * 100)}%`, icon: Percent },
+    { label: "Salary vs Spend Ratio", value: `${Math.round(user.incomeVsSpendRatio * 100)}%`, icon: Percent },
   ];
 
   return (
@@ -22,7 +22,7 @@ const BehavioralDNA = ({ user, riskTrend }: BehavioralDNAProps) => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Brain className="h-4 w-4 text-primary" />
-            Behavioral DNA Profile
+            Indian UPI Behavioral DNA Profile
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">

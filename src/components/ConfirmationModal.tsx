@@ -19,9 +19,9 @@ const ConfirmationModal = ({ open, onOpenChange, result, onConfirm }: Confirmati
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-warning/15">
             <AlertTriangle className="h-6 w-6 text-warning" />
           </div>
-          <DialogTitle className="text-center text-lg">Unusual Transaction Detected</DialogTitle>
+          <DialogTitle className="text-center text-lg">Unusual UPI Transaction Detected</DialogTitle>
           <DialogDescription className="text-center text-xs">
-            Transaction flagged due to significant behavioral deviation. No automatic blocking — your confirmation is required.
+            Transaction flagged due to deviation from Indian UPI behavioral profile. No automatic blocking — your confirmation is required.
           </DialogDescription>
         </DialogHeader>
 

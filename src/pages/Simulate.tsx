@@ -10,20 +10,25 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, AlertCircle } from "lucide-react";
-import { AnalysisResult, RiskLevel, ScoringResult } from "@/lib/types";
+import { AnalysisResult, RiskLevel } from "@/lib/types";
 import { useDemo } from "@/lib/demo-context";
-import { userDataset } from "@/lib/dataset";
+import { userDataset, getUpiInfo } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
 import { analyzeTransaction, confirmTransaction } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-const countries = [
-  "United States", "United Kingdom", "Canada", "Germany", "France", "Japan",
-  "Australia", "Brazil", "India", "Nigeria", "China", "South Korea",
-  "Mexico", "Italy", "Spain", "Russia", "South Africa", "UAE",
+const indianCities = [
+  "Chennai", "Mumbai", "Bangalore", "Delhi", "Kolkata", "Hyderabad",
+  "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Kochi", "Coimbatore",
+  "Gurgaon", "Noida", "Imphal", "Gangtok", "Port Blair",
 ];
 
-const categories = ["Food & Dining", "Shopping", "Travel", "Entertainment", "Bills & Utilities", "Healthcare", "Other"];
+const categories = ["Food & Dining", "Shopping", "Groceries", "Travel", "Entertainment", "Bills & Utilities", "Healthcare", "Other"];
+
+const sampleUpiIds = [
+  "swiggy@paytm", "flipkart@axl", "bigbasket@razorpay", "zomato@ybl",
+  "quickcash9871@ybl", "earnmoney.now@okaxis", "lucky.winner2026@paytm",
+];
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -38,7 +43,8 @@ const Simulate = () => {
   const { demoMode } = useDemo();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
-  const [location, setLocation] = useState("");
+  const [city, setCity] = useState("");
+  const [upiId, setUpiId] = useState("");
   const [category, setCategory] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,7 +52,7 @@ const Simulate = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !location) return;
+    if (!amount || !city || !upiId) return;
 
     setLoading(true);
     setResult(null);
@@ -55,13 +61,14 @@ const Simulate = () => {
       let analysis: AnalysisResult;
       if (demoMode) {
         await new Promise((r) => setTimeout(r, 800));
-        const user = userDataset[0]; // Use first dataset user for simulation
-        analysis = scoreTransaction(`sim-${Date.now()}`, parseFloat(amount), location, user);
+        const user = userDataset[0];
+        const upiInfo = getUpiInfo(upiId);
+        analysis = scoreTransaction(`sim-${Date.now()}`, parseFloat(amount), city, upiId, upiInfo, user);
       } else {
         analysis = await analyzeTransaction({
-          userId: "demo-user-001",
+          userId: "IND-001",
           amount: parseFloat(amount),
-          location,
+          location: city,
           timestamp: new Date().toISOString(),
         });
       }
@@ -85,7 +92,7 @@ const Simulate = () => {
       }
       toast({
         title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
-        description: response === "legit" ? "Transaction marked as legitimate." : "This transaction has been reported as fraud.",
+        description: response === "legit" ? "UPI behavioral profile updated." : "This transaction has been reported as UPI fraud.",
       });
     } catch {
       toast({ title: "Error", description: "Failed to confirm transaction", variant: "destructive" });
@@ -99,40 +106,44 @@ const Simulate = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
-        {/* Form */}
         <Card className="rounded-2xl shadow-sm border-border/50">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Send className="h-4 w-4 text-primary" />
-              Analyze New Transaction
+              Analyze UPI Transaction
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-xs">Amount ($)</Label>
+                <Label className="text-xs">Amount (₹)</Label>
                 <Input
                   type="number"
-                  placeholder="0.00"
+                  placeholder="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   min="0"
-                  step="0.01"
+                  step="1"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Location</Label>
-                <Select value={location} onValueChange={setLocation} required>
-                  <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                <Label className="text-xs">City</Label>
+                <Select value={city} onValueChange={setCity} required>
+                  <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
                   <SelectContent>
-                    {countries.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {indianCities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Date & Time</Label>
-                <Input value={new Date().toLocaleString()} disabled />
+                <Label className="text-xs">UPI ID</Label>
+                <Select value={upiId} onValueChange={setUpiId} required>
+                  <SelectTrigger><SelectValue placeholder="Select UPI ID" /></SelectTrigger>
+                  <SelectContent>
+                    {sampleUpiIds.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">Category (optional)</Label>
@@ -144,15 +155,14 @@ const Simulate = () => {
                 </Select>
               </div>
               <div className="sm:col-span-2">
-                <Button type="submit" className="w-full" disabled={loading || !amount || !location}>
-                  {loading ? "Analyzing..." : "Analyze Transaction"}
+                <Button type="submit" className="w-full" disabled={loading || !amount || !city || !upiId}>
+                  {loading ? "Analyzing..." : "Analyze UPI Transaction"}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        {/* Result */}
         {result && (
           <Card className="rounded-2xl shadow-sm border-border/50 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
             <CardContent className="p-6 space-y-6">
