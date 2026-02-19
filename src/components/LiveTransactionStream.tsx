@@ -139,7 +139,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary animate-pulse" />
-              Live UPI Transaction Stream
+              Live Transaction Stream
               <Badge variant="outline" className="ml-auto text-xs bg-safe/10 text-safe border-safe/30">
                 ● Live
               </Badge>
@@ -192,7 +192,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />
-              UPI Risk Analysis
+              Risk Analysis
             </CardTitle>
             <p className="text-[10px] text-muted-foreground mt-0.5">Lightweight Detection Layer – Flagging Only (No Auto Blocking)</p>
           </CardHeader>
@@ -245,10 +245,10 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
                   </div>
                 </div>
 
-                {/* B. ML Anomaly Engine (UPI-Specific) */}
+                {/* B. ML Anomaly Engine */}
                 <div className="space-y-2 pt-2 border-t border-border">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine (UPI)</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine</p>
                     <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
                   </div>
                   <div className="space-y-1.5">
@@ -291,7 +291,7 @@ const LiveTransactionStream = ({ simulationFlags }: LiveTransactionStreamProps) 
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <BarChart3 className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Click a transaction to view<br />UPI dataset-driven risk analysis</p>
+                <p className="text-xs text-muted-foreground">Click a transaction to view<br />dataset-driven risk analysis</p>
               </div>
             )}
           </CardContent>

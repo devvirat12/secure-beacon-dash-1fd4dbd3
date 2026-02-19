@@ -5,7 +5,7 @@ import BehavioralDNA from "@/components/BehavioralDNA";
 import TransactionsTable from "@/components/TransactionsTable";
 import LiveTransactionStream from "@/components/LiveTransactionStream";
 import DetectionArchitecture from "@/components/DetectionArchitecture";
-import SimulationControls, { SimulationFlags } from "@/components/SimulationControls";
+import SimulationControls, { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
 import { useDemo } from "@/lib/demo-context";
 import { mockUser, mockTransactions, mockRiskTrend } from "@/lib/mock-data";
 import { Shield } from "lucide-react";
@@ -42,6 +42,7 @@ const Index = () => {
     paymentLink: false,
     nightTransaction: false,
   });
+  const [simTxnType, setSimTxnType] = useState<SimTransactionType>("normal");
 
   const [testLink, setTestLink] = useState("");
   const [linkResult, setLinkResult] = useState<{ domain: string; risk: string; score: number } | null>(null);
@@ -60,6 +61,8 @@ const Index = () => {
         <SimulationControls
           flags={simFlags}
           onFlagsChange={setSimFlags}
+          simTxnType={simTxnType}
+          onSimTxnTypeChange={setSimTxnType}
           testLink={testLink}
           onTestLinkChange={setTestLink}
           linkResult={linkResult}
