@@ -8,11 +8,11 @@ interface MetricCardsProps {
 
 const MetricCards = ({ user }: MetricCardsProps) => {
   const metrics = [
-    { label: "Monthly Income", value: `$${user.monthlyIncome.toLocaleString()}`, icon: DollarSign, color: "text-safe" },
-    { label: "Avg Transaction", value: `$${user.avgTransactionAmount.toLocaleString()}`, icon: CreditCard, color: "text-primary" },
-    { label: "Avg Monthly Spend", value: `$${user.avgMonthlySpend.toLocaleString()}`, icon: TrendingUp, color: "text-warning" },
+    { label: "Monthly Salary", value: `₹${user.monthlySalary.toLocaleString("en-IN")}`, icon: DollarSign, color: "text-safe" },
+    { label: "Avg Transaction", value: `₹${user.avgTransactionAmount.toLocaleString("en-IN")}`, icon: CreditCard, color: "text-primary" },
+    { label: "Avg Monthly Spend", value: `₹${user.avgMonthlySpend.toLocaleString("en-IN")}`, icon: TrendingUp, color: "text-warning" },
     { label: "Weekly Frequency", value: `${user.weeklyTransactionFrequency} txns`, icon: Activity, color: "text-primary" },
-    { label: "Usual Locations", value: user.usualLocations.join(", "), icon: MapPin, color: "text-muted-foreground" },
+    { label: "Usual Cities", value: user.usualCities.join(", "), icon: MapPin, color: "text-muted-foreground" },
   ];
 
   return (

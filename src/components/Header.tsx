@@ -17,8 +17,8 @@ const Header = () => {
             <Shield className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground">2C: Real-Time Payment Anomaly Detector</h1>
-            <p className="text-xs text-muted-foreground">Hybrid Rule + ML Fraud Intelligence Layer</p>
+            <h1 className="text-lg font-bold tracking-tight text-foreground">2C: Real-Time UPI Payment Anomaly Detector</h1>
+            <p className="text-xs text-muted-foreground">Hybrid Rule + ML Fraud Intelligence Layer • India UPI Ecosystem</p>
           </div>
         </div>
 

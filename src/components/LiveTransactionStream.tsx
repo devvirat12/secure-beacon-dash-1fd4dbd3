@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, AlertTriangle, CheckCircle, XCircle, TrendingUp, MapPin, Zap, BarChart3 } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, Link2, UserX, Clock } from "lucide-react";
 import { RiskLevel, ScoringResult, LiveTransaction } from "@/lib/types";
 import { generateDatasetTransaction, getUserProfile } from "@/lib/dataset";
 import { scoreTransaction } from "@/lib/scoring-engine";
@@ -24,9 +24,11 @@ function generateScoredTransaction(recentCountMap: Map<string, number>): LiveTra
   const user = raw._userRef;
   const recentCount = recentCountMap.get(user.userId) || 0;
 
-  const scoring = scoreTransaction(raw.transactionId, raw.amount, raw.location, user, recentCount);
+  const scoring = scoreTransaction(
+    raw.transactionId, raw.amount, raw.city, raw.upiId, raw._upiInfo,
+    user, recentCount, raw.paymentLink, raw.timestamp
+  );
 
-  // Track frequency
   recentCountMap.set(user.userId, recentCount + 1);
 
   return {
@@ -34,7 +36,9 @@ function generateScoredTransaction(recentCountMap: Map<string, number>): LiveTra
     userId: user.userId,
     date: raw.timestamp,
     amount: raw.amount,
-    location: raw.location,
+    location: raw.city,
+    upiId: raw.upiId,
+    paymentLink: raw.paymentLink,
     riskScore: scoring.riskScore,
     riskLevel: scoring.riskLevel,
     status: scoring.riskScore >= 50 ? "Pending" : "Confirmed Legit",
@@ -82,23 +86,25 @@ const LiveTransactionStream = () => {
   const handleConfirm = (response: "legit" | "fraud") => {
     if (!selectedTxnId) return;
 
-    // If confirmed legit, update user's behavioral profile
     if (response === "legit") {
       const txn = transactions.find((t) => t.id === selectedTxnId);
       if (txn) {
         const user = getUserProfile(txn.userId);
         if (user) {
-          // Incrementally update average
           const histLen = user.transactionHistory.length;
-          user.avgTransactionAmount = Math.round(((user.avgTransactionAmount * histLen) + txn.amount) / (histLen + 1) * 100) / 100;
+          user.avgTransactionAmount = Math.round(((user.avgTransactionAmount * histLen) + txn.amount) / (histLen + 1));
           user.transactionHistory.push({
             transactionId: txn.id,
             userId: txn.userId,
             amount: txn.amount,
             timestamp: txn.date,
-            location: txn.location,
+            city: txn.location,
+            upiId: txn.upiId || "",
             category: "Other",
           });
+          if (txn.upiId && !user.usualUpiIds.includes(txn.upiId)) {
+            user.usualUpiIds.push(txn.upiId);
+          }
         }
       }
     }
@@ -112,7 +118,7 @@ const LiveTransactionStream = () => {
     );
     toast({
       title: response === "legit" ? "Transaction Confirmed" : "Fraud Reported",
-      description: response === "legit" ? "Behavioral profile updated." : "Transaction reported as fraud.",
+      description: response === "legit" ? "UPI behavioral profile updated." : "Transaction reported as UPI fraud.",
     });
     setShowModal(false);
   };
@@ -125,7 +131,7 @@ const LiveTransactionStream = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary animate-pulse" />
-              Live Transaction Stream
+              Live UPI Transaction Stream
               <Badge variant="outline" className="ml-auto text-xs bg-safe/10 text-safe border-safe/30">
                 ● Live
               </Badge>
@@ -154,11 +160,9 @@ const LiveTransactionStream = () => {
                     <div className="min-w-0 flex-1 grid grid-cols-5 gap-2 items-center text-xs">
                       <span className="text-muted-foreground font-mono truncate">{txn.id}</span>
                       <span className="text-muted-foreground">{txn.userId}</span>
-                      <span className="font-medium text-foreground">${txn.amount.toLocaleString()}</span>
+                      <span className="font-medium text-foreground">₹{txn.amount.toLocaleString("en-IN")}</span>
                       <span className="text-muted-foreground truncate">{txn.location}</span>
-                      <span className="text-muted-foreground">
-                        {new Date(txn.date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                      </span>
+                      <span className="text-muted-foreground truncate">{txn.upiId}</span>
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       <span className={`text-xs font-semibold ${txn.riskScore >= 70 ? "text-danger" : txn.riskScore >= 50 ? "text-warning" : "text-safe"}`}>
@@ -180,9 +184,9 @@ const LiveTransactionStream = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />
-              Risk Analysis
+              UPI Risk Analysis
             </CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Detection Layer: Flagging Only (No Automatic Blocking)</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Lightweight Detection Layer – Flagging Only (No Auto Blocking)</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedDetail?._scoring ? (
@@ -199,7 +203,6 @@ const LiveTransactionStream = () => {
                     {riskLabels[selectedDetail.riskLevel]}
                   </Badge>
 
-                  {/* Formula */}
                   <div className="rounded-lg bg-muted p-2">
                     <p className="text-[10px] text-muted-foreground text-center font-mono">
                       Final = (Rule × 0.6) + (ML × 0.4)
@@ -218,10 +221,11 @@ const LiveTransactionStream = () => {
                   </div>
                   <div className="space-y-1.5">
                     {[
-                      { label: "Amount Deviation Trigger", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
-                      { label: "Location Anomaly Trigger", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
-                      { label: "Income Ratio Trigger", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
-                      { label: "Frequency Spike Trigger", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
+                      { label: "Amount Deviation", flag: selectedDetail._scoring.metrics.amountDeviation > 3, value: `${selectedDetail._scoring.metrics.amountDeviation.toFixed(1)}x` },
+                      { label: "City Anomaly", flag: selectedDetail._scoring.metrics.locationFlag, value: selectedDetail._scoring.metrics.locationFlag ? "FLAGGED" : "OK" },
+                      { label: "Salary Ratio", flag: selectedDetail._scoring.metrics.monthlySpendRatio > 1.5, value: `${selectedDetail._scoring.metrics.monthlySpendRatio.toFixed(2)}` },
+                      { label: "Frequency Spike", flag: selectedDetail._scoring.metrics.frequencySpike, value: selectedDetail._scoring.metrics.frequencySpike ? "SPIKE" : "NORMAL" },
+                      { label: "Night Transaction", flag: selectedDetail._scoring.metrics.isNightTransaction, value: selectedDetail._scoring.metrics.isNightTransaction ? "2AM–5AM" : "OK" },
                     ].map((rule) => (
                       <div key={rule.label} className="flex items-center justify-between text-[11px]">
                         <span className="text-muted-foreground">{rule.label}</span>
@@ -233,21 +237,28 @@ const LiveTransactionStream = () => {
                   </div>
                 </div>
 
-                {/* B. ML Anomaly Engine */}
+                {/* B. ML Anomaly Engine (UPI-Specific) */}
                 <div className="space-y-2 pt-2 border-t border-border">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine (UPI)</p>
                     <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
                   </div>
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Weighted Deviation Score</span>
-                      <span className="font-semibold text-foreground">{selectedDetail._scoring.mlScore}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Behavioral Drift</span>
-                      <span className="font-semibold text-foreground">{selectedDetail._scoring.behavioralScore}</span>
-                    </div>
+                    {[
+                      { label: "UPI ID Age", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d` },
+                      { label: "First-Time Beneficiary", icon: UserX, flag: selectedDetail._scoring.metrics.isFirstTimeBeneficiary, value: selectedDetail._scoring.metrics.isFirstTimeBeneficiary ? "YES" : "NO" },
+                      { label: "Payment Link", icon: Link2, flag: selectedDetail._scoring.metrics.isPaymentLink, value: selectedDetail._scoring.metrics.isPaymentLink ? selectedDetail._scoring.metrics.linkRisk.toUpperCase() : "NONE" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center gap-1">
+                          <item.icon className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{item.label}</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                          {item.value}
+                        </Badge>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -256,7 +267,7 @@ const LiveTransactionStream = () => {
                   <div className="space-y-1.5 pt-2 border-t border-border">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
                     {selectedDetail.riskScore >= 50 && (
-                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>
+                      <p className="text-[10px] text-warning font-medium">Transaction flagged due to deviation from Indian UPI behavioral profile.</p>
                     )}
                     <ul className="space-y-1">
                       {selectedDetail._scoring.reasons.map((r, i) => (
@@ -272,7 +283,7 @@ const LiveTransactionStream = () => {
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <BarChart3 className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Click a transaction to view<br />dataset-driven risk analysis</p>
+                <p className="text-xs text-muted-foreground">Click a transaction to view<br />UPI dataset-driven risk analysis</p>
               </div>
             )}
           </CardContent>
