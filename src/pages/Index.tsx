@@ -11,7 +11,10 @@ const Index = () => {
   const riskTrend = mockRiskTrend;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen">
+      {/* blue orb accents matching landing page */}
+      <div aria-hidden className="pointer-events-none fixed -top-40 -left-40 h-[600px] w-[600px] rounded-full blur-[120px] -z-10" style={{ background: "hsla(221,83%,53%,0.12)" }} />
+      <div aria-hidden className="pointer-events-none fixed -bottom-40 -right-40 h-[500px] w-[500px] rounded-full blur-[120px] -z-10" style={{ background: "hsla(210,90%,60%,0.10)" }} />
       <Header />
       <main className="mx-auto max-w-7xl space-y-5 p-6">
         <MetricCards user={user} />
