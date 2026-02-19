@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import SimulationControls from "@/components/SimulationControls";
+
 import ReceiverRiskPanel from "@/components/ReceiverRiskPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -199,9 +199,6 @@ const Simulate = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-4xl space-y-5 p-6">
-        {/* Simulation Control Panel */}
-        <SimulationControls />
-
         {/* Analyze Transaction */}
         <Card className="glass-card">
           <CardHeader className="pb-4 border-b border-border">
