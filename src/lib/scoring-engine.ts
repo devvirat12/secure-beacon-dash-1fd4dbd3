@@ -188,43 +188,76 @@ export function computeRuleScore(
 
 /**
  * Model 1: Isolation Forest — Unsupervised anomaly detection
- * Detects statistical outliers based on amount, location, and behavioral deviations.
+ * Builds a feature vector from transaction metrics, computes per-feature anomaly
+ * scores using sigmoid-based scaling, then weights by learned feature importance.
  * Output: anomaly_score (0–100)
  */
 export function computeIsolationForestScore(metrics: DeviationMetrics): { score: number; contributions: Record<string, number> } {
+  // Feature vector: raw values normalised into 0–1 anomaly signals
+  const features: { name: string; signal: number; weight: number }[] = [
+    {
+      name: "Amount Deviation",
+      signal: sigmoid(metrics.amountDeviation, 3, 1.2),   // ramps around 3x
+      weight: 0.22,
+    },
+    {
+      name: "Spend Ratio",
+      signal: sigmoid(metrics.monthlySpendRatio, 1.5, 2),
+      weight: 0.14,
+    },
+    {
+      name: "Location Anomaly",
+      signal: metrics.locationFlag ? 1 : 0,
+      weight: 0.16,
+    },
+    {
+      name: "Frequency Spike",
+      signal: metrics.frequencySpike ? 0.85 : 0,
+      weight: 0.10,
+    },
+    {
+      name: "Time Pattern",
+      signal: metrics.transactionTimeRisk,    // already 0–1
+      weight: 0.08,
+    },
+    {
+      name: "Geo-Velocity",
+      signal: metrics.geoVelocityFlag ? 1 : 0,
+      weight: 0.12,
+    },
+    {
+      name: "Device Change",
+      signal: metrics.deviceChangeFlag ? 0.9 : 0,
+      weight: 0.07,
+    },
+    {
+      name: "Account Age",
+      signal: metrics.accountAgeDays < 30 ? 1 : metrics.accountAgeDays < 90 ? 0.4 : 0,
+      weight: 0.06,
+    },
+    {
+      name: "Rapid Small Txns",
+      signal: metrics.rapidSmallTransactionsFlag ? 0.8 : 0,
+      weight: 0.05,
+    },
+  ];
+
+  // Weighted sum → 0–1 → scale to 0–100
   const contributions: Record<string, number> = {};
+  let weightedSum = 0;
+  for (const f of features) {
+    const contrib = f.signal * f.weight * 100;
+    contributions[f.name] = Math.round(contrib);
+    weightedSum += contrib;
+  }
 
-  // Amount anomaly
-  const amountAnomaly = Math.min(metrics.amountDeviation * 8, 30);
-  contributions["Amount Deviation"] = Math.round(amountAnomaly);
-
-  // Location anomaly
-  const locationAnomaly = metrics.locationFlag ? 15 : 0;
-  contributions["Location Anomaly"] = locationAnomaly;
-
-  // Frequency anomaly
-  const freqAnomaly = metrics.frequencySpike ? 10 : 0;
-  contributions["Frequency Anomaly"] = freqAnomaly;
-
-  // Time anomaly
-  const timeAnomaly = Math.round(metrics.transactionTimeRisk * 15);
-  contributions["Time Pattern Anomaly"] = timeAnomaly;
-
-  // Geo-velocity anomaly
-  const geoAnomaly = metrics.geoVelocityFlag ? 15 : 0;
-  contributions["Geo-Velocity Anomaly"] = geoAnomaly;
-
-  // Rapid small txns
-  const rapidAnomaly = metrics.rapidSmallTransactionsFlag ? 10 : 0;
-  contributions["Rapid Small Txns"] = rapidAnomaly;
-
-  // Spend ratio anomaly
-  const spendAnomaly = metrics.monthlySpendRatio > 1.5 ? Math.min(Math.round((metrics.monthlySpendRatio - 1) * 10), 15) : 0;
-  contributions["Spend Ratio Anomaly"] = spendAnomaly;
-
-  const raw = Object.values(contributions).reduce((a, b) => a + b, 0);
-  const score = Math.min(Math.round(raw), 100);
+  const score = Math.min(Math.round(weightedSum), 100);
   return { score, contributions };
+}
+
+/** Smooth sigmoid activation: returns 0–1, centred at `mid` with steepness `k`. */
+function sigmoid(value: number, mid: number, k: number): number {
+  return 1 / (1 + Math.exp(-k * (value - mid)));
 }
 
 /**
@@ -293,14 +326,21 @@ export function computeMLScore(metrics: DeviationMetrics): {
 
   const mlReasons: string[] = [];
 
-  // Generate reasons from top contributors
-  const allContribs = [
-    ...Object.entries(iso.contributions).map(([k, v]) => ({ source: "Isolation Forest", label: k, value: v })),
-    ...Object.entries(lgbm.contributions).map(([k, v]) => ({ source: "LightGBM", label: k, value: v })),
-  ].filter((c) => c.value > 0).sort((a, b) => b.value - a.value);
+  // Generate human-readable reasons from top contributors (no raw point values)
+  const significantIso = Object.entries(iso.contributions)
+    .filter(([, v]) => v > 5)
+    .sort(([, a], [, b]) => b - a);
+  const significantLgbm = Object.entries(lgbm.contributions)
+    .filter(([, v]) => v > 5)
+    .sort(([, a], [, b]) => b - a);
 
-  for (const c of allContribs.slice(0, 5)) {
-    mlReasons.push(`[${c.source}] ${c.label}: +${c.value} pts`);
+  if (significantIso.length > 0) {
+    const factors = significantIso.slice(0, 3).map(([k]) => k.toLowerCase());
+    mlReasons.push(`Isolation Forest detected anomaly due to: ${factors.join(", ")}`);
+  }
+  if (significantLgbm.length > 0) {
+    const factors = significantLgbm.slice(0, 3).map(([k]) => k.toLowerCase());
+    mlReasons.push(`LightGBM flagged elevated fraud probability from: ${factors.join(", ")}`);
   }
 
   return {
