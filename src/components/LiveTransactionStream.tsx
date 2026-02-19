@@ -7,7 +7,7 @@ import { generateDatasetTransaction, getUserProfile, SimulationInjection } from 
 import { scoreTransaction } from "@/lib/scoring-engine";
 import ConfirmationModal from "@/components/ConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
-import { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
+import { SimTransactionType } from "@/components/SimulationControls";
 
 const riskBadgeStyle = (level: RiskLevel) => {
   const map: Record<RiskLevel, string> = {
@@ -42,7 +42,6 @@ function generateScoredTransaction(
 
   recentCountMap.set(user.userId, recentCount + 1);
 
-  // Determine display type
   let displayType = "standard";
   if (raw.paymentLink) displayType = "payment_link";
   else if (raw.upiId && !["bigbasket@razorpay", "swiggy@paytm", "flipkart@axl", "irctc@sbi", "apollo247@hdfcbank", "electricity.tneb@paytm", "zomato@ybl"].every(id => id !== raw.upiId)) displayType = "upi";
@@ -64,12 +63,7 @@ function generateScoredTransaction(
   };
 }
 
-interface LiveTransactionStreamProps {
-  simulationFlags?: SimulationFlags;
-  simTxnType?: SimTransactionType;
-}
-
-const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionStreamProps) => {
+const LiveTransactionStream = () => {
   const [transactions, setTransactions] = useState<(LiveTransaction & { _scoring?: ScoringResult; _txnType?: string })[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedScoring, setSelectedScoring] = useState<ScoringResult | null>(null);
@@ -89,18 +83,12 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const injection: SimulationInjection | undefined = simulationFlags && Object.values(simulationFlags).some(Boolean)
-        ? simulationFlags
-        : undefined;
-
-      // Rotate transaction types naturally when no specific type forced
-      const effectiveType = simTxnType || (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
-
-      const newTxn = generateScoredTransaction(frequencyMap.current, injection, effectiveType);
+      const effectiveType = (["normal", "upi", "payment_link"] as SimTransactionType[])[Math.floor(Math.random() * 3)];
+      const newTxn = generateScoredTransaction(frequencyMap.current, undefined, effectiveType);
       setTransactions((prev) => [newTxn, ...prev].slice(0, 50));
     }, 2000 + Math.random() * 1000);
     return () => clearInterval(interval);
-  }, [simulationFlags, simTxnType]);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -154,7 +142,7 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Stream */}
-        <Card className="rounded-2xl shadow-sm border-border/50 lg:col-span-2">
+        <Card className="glass-card rounded-2xl lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary animate-pulse" />
@@ -166,14 +154,14 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
           </CardHeader>
           <CardContent className="p-0">
             <div ref={scrollRef} className="max-h-[400px] overflow-y-auto">
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {transactions.map((txn) => (
                   <div
                     key={txn.id}
                     onClick={() => handleRowClick(txn)}
                     className={`flex items-center gap-4 px-6 py-3 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300 ${
                       txn.status === "Fraud" ? "bg-danger/5" : ""
-                    } ${selectedDetail?.id === txn.id ? "bg-primary/5" : ""} cursor-pointer hover:bg-muted/50`}
+                    } ${selectedDetail?.id === txn.id ? "bg-primary/5" : ""} cursor-pointer hover:bg-secondary/30`}
                   >
                     <div className="shrink-0">
                       {txn.status === "Fraud" ? (
@@ -209,13 +197,13 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
         </Card>
 
         {/* Risk Analysis Panel */}
-        <Card className="rounded-2xl shadow-sm border-border/50">
+        <Card className="glass-card rounded-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />
               Risk Analysis
             </CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Lightweight Detection Layer – Flagging Only (No Auto Blocking)</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Flagging Only — No Auto Blocking</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedDetail?._scoring ? (
@@ -232,7 +220,7 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
                     {riskLabels[selectedDetail.riskLevel]}
                   </Badge>
 
-                  <div className="rounded-lg bg-muted p-2">
+                  <div className="rounded-lg bg-secondary/50 p-2">
                     <p className="text-[10px] text-muted-foreground text-center font-mono">
                       Final = (Rule × 0.6) + (ML × 0.4)
                     </p>
@@ -243,7 +231,7 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
                 </div>
 
                 {/* A. Rule-Based Engine */}
-                <div className="space-y-2 pt-2 border-t border-border">
+                <div className="space-y-2 pt-2 border-t border-border/50">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">A. Rule-Based Engine</p>
                     <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.ruleScore}/100</span>
@@ -267,16 +255,16 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
                 </div>
 
                 {/* B. ML Anomaly Engine */}
-                <div className="space-y-2 pt-2 border-t border-border">
+                <div className="space-y-2 pt-2 border-t border-border/50">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine (Multi-Model)</p>
                     <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
                   </div>
                   <div className="space-y-1.5">
                     {[
-                      { label: "Beneficiary Age", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d` },
-                      { label: "First-Time Beneficiary", icon: UserX, flag: selectedDetail._scoring.metrics.isFirstTimeBeneficiary, value: selectedDetail._scoring.metrics.isFirstTimeBeneficiary ? "YES" : "NO" },
-                      { label: "Payment Link", icon: Link2, flag: selectedDetail._scoring.metrics.isPaymentLink, value: selectedDetail._scoring.metrics.isPaymentLink ? selectedDetail._scoring.metrics.linkRisk.toUpperCase() : "NONE" },
+                      { label: "Isolation Forest", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d age` },
+                      { label: "Logistic Regression", icon: UserX, flag: selectedDetail._scoring.metrics.isFirstTimeBeneficiary, value: selectedDetail._scoring.metrics.isFirstTimeBeneficiary ? "FLAGGED" : "OK" },
+                      { label: "Gradient Boosting", icon: Link2, flag: selectedDetail._scoring.metrics.isPaymentLink, value: selectedDetail._scoring.metrics.isPaymentLink ? selectedDetail._scoring.metrics.linkRisk.toUpperCase() : "NONE" },
                     ].map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1">
@@ -293,7 +281,7 @@ const LiveTransactionStream = ({ simulationFlags, simTxnType }: LiveTransactionS
 
                 {/* Explainable Reasons */}
                 {selectedDetail._scoring.reasons.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-border">
+                  <div className="space-y-1.5 pt-2 border-t border-border/50">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Explainable Alert</p>
                     {selectedDetail.riskScore >= 50 && (
                       <p className="text-[10px] text-warning font-medium">Transaction flagged due to significant behavioral deviation.</p>

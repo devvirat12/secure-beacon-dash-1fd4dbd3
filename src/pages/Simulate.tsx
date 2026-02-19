@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import DetectionArchitecture from "@/components/DetectionArchitecture";
+import SimulationControls, { SimulationFlags, SimTransactionType } from "@/components/SimulationControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +69,15 @@ const Simulate = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
+  const [simFlags, setSimFlags] = useState<SimulationFlags>({
+    highAmount: false,
+    newUpiId: false,
+    firstTimeBeneficiary: false,
+    paymentLink: false,
+    nightTransaction: false,
+  });
+  const [simTxnType, setSimTxnType] = useState<SimTransactionType>("normal");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !city) return;
@@ -134,13 +143,19 @@ const Simulate = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
-        {/* Detection flow moved here */}
-        <DetectionArchitecture />
+        {/* Simulation Control Panel */}
+        <SimulationControls
+          flags={simFlags}
+          onFlagsChange={setSimFlags}
+          simTxnType={simTxnType}
+          onSimTxnTypeChange={setSimTxnType}
+        />
 
-        <Card className="rounded-2xl shadow-sm border-border/50">
+        {/* Analyze Transaction */}
+        <Card className="glass-card rounded-2xl">
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Send className="h-4 w-4 text-primary" />
@@ -167,12 +182,12 @@ const Simulate = () => {
 
               <div className="space-y-2">
                 <Label className="text-xs">Amount (₹)</Label>
-                <Input type="number" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} min="0" step="1" required />
+                <Input type="number" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} min="0" step="1" required className="bg-secondary/50 border-border" />
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">City</Label>
                 <Select value={city} onValueChange={setCity} required>
-                  <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+                  <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select city" /></SelectTrigger>
                   <SelectContent>
                     {indianCities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
@@ -183,7 +198,7 @@ const Simulate = () => {
                 <div className="space-y-2">
                   <Label className="text-xs">UPI ID</Label>
                   <Select value={upiId} onValueChange={setUpiId} required>
-                    <SelectTrigger><SelectValue placeholder="Select UPI ID" /></SelectTrigger>
+                    <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select UPI ID" /></SelectTrigger>
                     <SelectContent>
                       {sampleUpiIds.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
@@ -197,14 +212,14 @@ const Simulate = () => {
                     <Link2 className="h-3 w-3 text-primary" />
                     Payment Link URL
                   </Label>
-                  <Input placeholder="e.g. bit.ly/win50k or razorpay.com/pay" value={paymentLinkInput} onChange={(e) => setPaymentLinkInput(e.target.value)} required />
+                  <Input placeholder="e.g. bit.ly/win50k or razorpay.com/pay" value={paymentLinkInput} onChange={(e) => setPaymentLinkInput(e.target.value)} required className="bg-secondary/50 border-border" />
                 </div>
               )}
 
               <div className="space-y-2">
                 <Label className="text-xs">Category (optional)</Label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
@@ -222,7 +237,7 @@ const Simulate = () => {
 
         {/* Payment Link Intelligence Panel */}
         {txnType === "payment_link" && linkAnalysis && (
-          <Card className="rounded-2xl shadow-sm border-border/50 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+          <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Globe className="h-4 w-4 text-primary" />
@@ -253,7 +268,7 @@ const Simulate = () => {
         )}
 
         {result && (
-          <Card className="rounded-2xl shadow-sm border-border/50 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+          <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
             <CardContent className="p-6 space-y-6">
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
                 <RiskGauge score={result.riskScore} />
@@ -280,7 +295,7 @@ const Simulate = () => {
               </div>
 
               {result.reasons.length > 0 && (
-                <div className="rounded-xl bg-muted p-4 space-y-2">
+                <div className="rounded-xl bg-secondary/50 p-4 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <AlertCircle className="h-3 w-3" />
                     Why was this flagged?

@@ -25,12 +25,12 @@ const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
   const filtered = filter === "all" ? transactions : transactions.filter((t) => t.riskLevel === filter);
 
   return (
-    <Card className="rounded-2xl shadow-sm border-border/50">
+    <Card className="glass-card rounded-2xl">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold text-foreground">Recent Transactions</CardTitle>
           <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <TabsList className="h-8">
+            <TabsList className="h-8 bg-secondary/50">
               <TabsTrigger value="all" className="text-xs px-2.5 h-6">All</TabsTrigger>
               <TabsTrigger value="SAFE" className="text-xs px-2.5 h-6">Safe</TabsTrigger>
               <TabsTrigger value="WARNING" className="text-xs px-2.5 h-6">Warning</TabsTrigger>

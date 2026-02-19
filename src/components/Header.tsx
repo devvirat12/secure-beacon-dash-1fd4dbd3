@@ -2,7 +2,6 @@ import { Shield, BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useDemo } from "@/lib/demo-context";
-import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 
 const Header = () => {
@@ -10,15 +9,15 @@ const Header = () => {
   const location = useLocation();
 
   return (
-    <header className="border-b border-border bg-card px-6 py-4">
+    <header className="glass-header px-6 py-4 sticky top-0 z-50">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Shield className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 border border-primary/30">
+            <Shield className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">Fraud Buster</h1>
-            <p className="text-xs text-muted-foreground">Real-Time Hybrid Anomaly Detection Engine • Rule-Based + ML Fraud Intelligence Layer</p>
+            <p className="text-xs text-muted-foreground">Real-Time Hybrid Anomaly Detection Engine</p>
           </div>
         </div>
 
@@ -37,7 +36,7 @@ const Header = () => {
             Simulate
           </a>
 
-          <div className="ml-4 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-1.5">
+          <div className="ml-4 flex items-center gap-2 rounded-lg glass-card-light px-3 py-1.5">
             <Label htmlFor="demo-mode" className="text-xs text-muted-foreground cursor-pointer">Demo</Label>
             <Switch id="demo-mode" checked={demoMode} onCheckedChange={setDemoMode} className="scale-75" />
           </div>
