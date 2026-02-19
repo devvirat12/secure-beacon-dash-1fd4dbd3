@@ -220,11 +220,17 @@ const LiveTransactionStream = () => {
                     {riskLabels[selectedDetail.riskLevel]}
                   </Badge>
 
-                  <div className="rounded-lg bg-secondary/50 p-2">
+                  <div className="rounded-lg bg-secondary/50 p-2 space-y-0.5">
                     <p className="text-[10px] text-muted-foreground text-center font-mono">
+                      ML = (IsoForest × 0.5) + (LightGBM × 0.5)
+                    </p>
+                    <p className="text-[10px] text-muted-foreground text-center font-mono">
+                      = ({selectedDetail._scoring.anomalyScore || 0} × 0.5) + ({selectedDetail._scoring.fraudProbability || 0} × 0.5) = <span className="font-bold text-foreground">{selectedDetail._scoring.mlScore}</span>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground text-center font-mono mt-1">
                       Final = (Rule × 0.6) + (ML × 0.4)
                     </p>
-                    <p className="text-[10px] text-muted-foreground text-center font-mono mt-0.5">
+                    <p className="text-[10px] text-muted-foreground text-center font-mono">
                       = ({selectedDetail._scoring.ruleScore} × 0.6) + ({selectedDetail._scoring.mlScore} × 0.4) = <span className="font-bold text-foreground">{selectedDetail.riskScore}</span>
                     </p>
                   </div>
@@ -257,20 +263,43 @@ const LiveTransactionStream = () => {
                 {/* B. ML Anomaly Engine */}
                 <div className="space-y-2 pt-2 border-t border-border/50">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Anomaly Engine (Multi-Model)</p>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">B. ML Engine (Hybrid)</p>
                     <span className="text-xs font-bold text-foreground">{selectedDetail._scoring.mlScore}/100</span>
                   </div>
+
+                  {/* Model breakdown */}
                   <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Isolation Forest (Anomaly)</span>
+                      </div>
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.anomalyScore || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                        {selectedDetail._scoring.anomalyScore || 0}/100
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1">
+                        <UserX className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">LightGBM (Fraud Prob.)</span>
+                      </div>
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${(selectedDetail._scoring.fraudProbability || 0) > 30 ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
+                        {selectedDetail._scoring.fraudProbability || 0}/100
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Enhanced feature flags */}
+                  <div className="space-y-1">
                     {[
-                      { label: "Isolation Forest", icon: Clock, flag: selectedDetail._scoring.metrics.upiAgeFlag, value: `${selectedDetail._scoring.metrics.upiAgeDays}d age` },
-                      { label: "Logistic Regression", icon: UserX, flag: selectedDetail._scoring.metrics.isFirstTimeBeneficiary, value: selectedDetail._scoring.metrics.isFirstTimeBeneficiary ? "FLAGGED" : "OK" },
-                      { label: "Gradient Boosting", icon: Link2, flag: selectedDetail._scoring.metrics.isPaymentLink, value: selectedDetail._scoring.metrics.isPaymentLink ? selectedDetail._scoring.metrics.linkRisk.toUpperCase() : "NONE" },
+                      { label: "Beneficiary Risk", flag: selectedDetail._scoring.metrics.beneficiaryRiskScore > 30, value: `${selectedDetail._scoring.metrics.beneficiaryRiskScore}/100` },
+                      { label: "Device Change", flag: selectedDetail._scoring.metrics.deviceChangeFlag, value: selectedDetail._scoring.metrics.deviceChangeFlag ? "FLAGGED" : "OK" },
+                      { label: "Geo-Velocity", flag: selectedDetail._scoring.metrics.geoVelocityFlag, value: selectedDetail._scoring.metrics.geoVelocityFlag ? "FLAGGED" : "OK" },
+                      { label: "Account Age", flag: selectedDetail._scoring.metrics.accountAgeDays < 90, value: `${selectedDetail._scoring.metrics.accountAgeDays}d` },
+                      { label: "Fraud History", flag: selectedDetail._scoring.metrics.historicalFraudExposureFlag, value: selectedDetail._scoring.metrics.historicalFraudExposureFlag ? "YES" : "NO" },
                     ].map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1">
-                          <item.icon className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">{item.label}</span>
-                        </div>
+                        <span className="text-muted-foreground">{item.label}</span>
                         <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
                           {item.value}
                         </Badge>
