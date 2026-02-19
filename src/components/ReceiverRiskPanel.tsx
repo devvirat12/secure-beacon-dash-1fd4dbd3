@@ -21,10 +21,10 @@ const flagBadge = (flag: boolean | undefined, trueLabel = "FLAGGED", falseLabel 
   return (
     <Badge
       variant="outline"
-      className={`text-[9px] px-1.5 py-0 ${
+      className={`text-[9px] px-1.5 py-0 font-medium ${
         flag
-          ? "bg-danger/15 text-danger border-danger/30"
-          : "bg-safe/15 text-safe border-safe/30"
+          ? "bg-danger/10 text-danger border-danger/20"
+          : "bg-safe/10 text-safe border-safe/20"
       }`}
     >
       {flag ? trueLabel : falseLabel}
@@ -63,9 +63,9 @@ const ReceiverRiskPanel = ({ data }: ReceiverRiskPanelProps) => {
       : "text-safe";
 
   return (
-    <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+    <Card className="glass-card animate-in fade-in-0 slide-in-from-bottom-4 duration-400">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-3">
           <CollapsibleTrigger className="w-full">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-primary" />
@@ -84,9 +84,9 @@ const ReceiverRiskPanel = ({ data }: ReceiverRiskPanelProps) => {
 
             {/* Receiver Risk Score */}
             {riskScore !== undefined && (
-              <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2">
-                <span className="text-xs text-muted-foreground">Receiver Risk Score</span>
-                <span className={`text-xl font-bold ${riskColor}`}>{riskScore}</span>
+              <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/40 px-4 py-3">
+                <span className="text-[11px] font-medium text-muted-foreground">Receiver Risk Score</span>
+                <span className={`text-2xl font-bold tabular-nums ${riskColor}`}>{riskScore}</span>
               </div>
             )}
 
@@ -151,10 +151,10 @@ const ReceiverRiskPanel = ({ data }: ReceiverRiskPanelProps) => {
                       </div>
                       <Badge
                         variant="outline"
-                        className={`text-[10px] px-2 py-0.5 ${
+                        className={`text-[10px] px-2 py-0.5 font-medium ${
                           row.danger
-                            ? "bg-danger/15 text-danger border-danger/30"
-                            : "bg-muted text-foreground border-border"
+                            ? "bg-danger/10 text-danger border-danger/20"
+                            : "bg-secondary text-foreground border-border"
                         }`}
                       >
                         {row.value}
@@ -169,8 +169,8 @@ const ReceiverRiskPanel = ({ data }: ReceiverRiskPanelProps) => {
               data.receiver_account_age_flag !== undefined ||
               data.merchant_flag !== undefined ||
               data.beneficiary_flag !== undefined) && (
-              <div className="space-y-2 border-t border-border/50 pt-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Detection Flags
                 </p>
                 <div className="space-y-1.5">
@@ -193,15 +193,15 @@ const ReceiverRiskPanel = ({ data }: ReceiverRiskPanelProps) => {
 
             {/* Receiver Reasons */}
             {data.receiver_reasons && data.receiver_reasons.length > 0 && (
-              <div className="space-y-2 border-t border-border/50 pt-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
                   <UserX className="h-3 w-3" />
                   Receiver-Side Risk Reasons
                 </p>
                 <ul className="space-y-1.5">
                   {data.receiver_reasons.map((reason, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-foreground">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-danger shrink-0" />
+                    <li key={i} className="flex items-start gap-2 text-[11px] text-foreground">
+                      <span className="mt-1.5 h-1 w-1 rounded-full bg-danger shrink-0" />
                       {reason}
                     </li>
                   ))}

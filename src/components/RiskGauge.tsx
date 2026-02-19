@@ -9,7 +9,7 @@ const RiskGauge = ({ score }: RiskGaugeProps) => {
 
   useEffect(() => {
     let start = 0;
-    const duration = 1200;
+    const duration = 1000;
     const startTime = performance.now();
 
     const animate = (currentTime: number) => {
@@ -24,10 +24,15 @@ const RiskGauge = ({ score }: RiskGaugeProps) => {
     requestAnimationFrame(animate);
   }, [score]);
 
-  const radius = 80;
+  const size = 160;
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (animatedScore / 100) * circumference * 0.75;
-  const rotation = -225;
+  // 270° arc (3/4 of circle), starting from bottom-left
+  const arcLength = circumference * 0.75;
+  const filled = (animatedScore / 100) * arcLength;
+  const offset = circumference - filled;
+  const rotation = -225; // start from bottom-left
 
   const color =
     animatedScore >= 70
@@ -36,38 +41,42 @@ const RiskGauge = ({ score }: RiskGaugeProps) => {
         ? "hsl(var(--warning))"
         : "hsl(var(--safe))";
 
+  const label =
+    animatedScore >= 70 ? "High Risk" : animatedScore >= 50 ? "Warning" : "Safe";
+
   return (
-    <div className="relative flex items-center justify-center">
-      <svg width="200" height="200" viewBox="0 0 200 200">
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Track */}
         <circle
-          cx="100"
-          cy="100"
+          cx={size / 2}
+          cy={size / 2}
           r={radius}
           fill="none"
           stroke="hsl(var(--border))"
-          strokeWidth="12"
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * 0.25}
-          transform={`rotate(${rotation} 100 100)`}
+          strokeDasharray={`${arcLength} ${circumference}`}
+          transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
         />
+        {/* Fill */}
         <circle
-          cx="100"
-          cy="100"
+          cx={size / 2}
+          cy={size / 2}
           r={radius}
           fill="none"
           stroke={color}
-          strokeWidth="12"
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          transform={`rotate(${rotation} 100 100)`}
+          strokeDasharray={`${filled} ${circumference}`}
+          strokeDashoffset={0}
+          transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
           className="transition-all duration-300"
         />
       </svg>
-      <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-bold text-foreground">{animatedScore}</span>
-        <span className="text-xs text-muted-foreground">Risk Score</span>
+      <div className="absolute flex flex-col items-center gap-0.5">
+        <span className="text-3xl font-bold text-foreground tabular-nums">{animatedScore}</span>
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
       </div>
     </div>
   );

@@ -196,15 +196,15 @@ const Simulate = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-4xl space-y-6 p-6">
+      <main className="mx-auto max-w-4xl space-y-5 p-6">
         {/* Simulation Control Panel */}
         <SimulationControls />
 
         {/* Analyze Transaction */}
-        <Card className="glass-card rounded-2xl">
-          <CardHeader>
+        <Card className="glass-card">
+          <CardHeader className="pb-4 border-b border-border">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Send className="h-4 w-4 text-primary" />
               Analyze Transaction
@@ -213,13 +213,13 @@ const Simulate = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
-                <Label className="text-xs">Transaction Type</Label>
-                <div className="flex gap-2 flex-wrap">
+                <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Transaction Type</Label>
+                <div className="flex gap-1.5 flex-wrap">
                   {(["standard", "upi", "payment_link"] as TransactionType[]).map((t) => (
                     <Button
                       key={t} type="button"
                       variant={txnType === t ? "default" : "outline"}
-                      size="sm" className="text-xs"
+                      size="sm" className={`text-xs h-8 ${txnType !== t ? "border-border text-muted-foreground hover:text-foreground" : ""}`}
                       onClick={() => { setTxnType(t); setResult(null); setLinkAnalysis(null); }}
                     >
                       {txnTypeLabels[t]}
@@ -228,14 +228,14 @@ const Simulate = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Amount (₹)</Label>
-                <Input type="number" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} min="0" step="1" required className="bg-secondary/50 border-border" />
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium text-muted-foreground">Amount (₹)</Label>
+                <Input type="number" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} min="0" step="1" required className="bg-secondary/30 border-border h-9 text-sm" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs">City</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium text-muted-foreground">City</Label>
                 <Select value={city} onValueChange={setCity} required>
-                  <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select city" /></SelectTrigger>
+                  <SelectTrigger className="bg-secondary/30 border-border h-9 text-sm"><SelectValue placeholder="Select city" /></SelectTrigger>
                   <SelectContent>
                     {indianCities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
@@ -243,10 +243,10 @@ const Simulate = () => {
               </div>
 
               {txnType === "upi" && (
-                <div className="space-y-2">
-                  <Label className="text-xs">UPI ID</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-medium text-muted-foreground">UPI ID</Label>
                   <Select value={upiId} onValueChange={setUpiId} required>
-                    <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select UPI ID" /></SelectTrigger>
+                    <SelectTrigger className="bg-secondary/30 border-border h-9 text-sm"><SelectValue placeholder="Select UPI ID" /></SelectTrigger>
                     <SelectContent>
                       {sampleUpiIds.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
@@ -255,19 +255,19 @@ const Simulate = () => {
               )}
 
               {txnType === "payment_link" && (
-                <div className="space-y-2">
-                  <Label className="text-xs flex items-center gap-1.5">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
                     <Link2 className="h-3 w-3 text-primary" />
                     Payment Link URL
                   </Label>
-                  <Input placeholder="e.g. bit.ly/win50k or razorpay.com/pay" value={paymentLinkInput} onChange={(e) => setPaymentLinkInput(e.target.value)} required className="bg-secondary/50 border-border" />
+                  <Input placeholder="e.g. bit.ly/win50k or razorpay.com/pay" value={paymentLinkInput} onChange={(e) => setPaymentLinkInput(e.target.value)} required className="bg-secondary/30 border-border h-9 text-sm" />
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label className="text-xs">Category (optional)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium text-muted-foreground">Category (optional)</Label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-secondary/50 border-border"><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectTrigger className="bg-secondary/30 border-border h-9 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
@@ -275,25 +275,26 @@ const Simulate = () => {
               </div>
 
               {/* ── Receiver Intelligence Fields (minimal, additive) ──────── */}
-              <div className="sm:col-span-2 pt-2 border-t border-border/50">
+              <div className="sm:col-span-2 pt-3 border-t border-border">
                 <div className="flex items-center gap-1.5 mb-3">
                   <UserCheck className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Receiver Intelligence (Optional)</span>
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Receiver Intelligence</span>
+                  <span className="text-[10px] text-muted-foreground ml-0.5">(optional)</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Receiver ID</Label>
-                    <Input placeholder="e.g. RCV-001" value={receiverId} onChange={(e) => setReceiverId(e.target.value)} className="bg-secondary/50 border-border h-9 text-xs" />
+                    <Label className="text-[11px] font-medium text-muted-foreground">Receiver ID</Label>
+                    <Input placeholder="e.g. RCV-001" value={receiverId} onChange={(e) => setReceiverId(e.target.value)} className="bg-secondary/30 border-border h-9 text-sm" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Transaction ID (optional)</Label>
-                    <Input placeholder="e.g. TXN-20260219" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="bg-secondary/50 border-border h-9 text-xs" />
+                    <Label className="text-[11px] font-medium text-muted-foreground">Transaction ID</Label>
+                    <Input placeholder="e.g. TXN-20260219" value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="bg-secondary/30 border-border h-9 text-sm" />
                   </div>
                 </div>
               </div>
 
-              <div className="sm:col-span-2">
-                <Button type="submit" className="w-full" disabled={loading || !amount || !city || (txnType === "upi" && !upiId) || (txnType === "payment_link" && !paymentLinkInput)}>
+              <div className="sm:col-span-2 pt-1">
+                <Button type="submit" className="w-full h-10 text-sm font-medium" disabled={loading || !amount || !city || (txnType === "upi" && !upiId) || (txnType === "payment_link" && !paymentLinkInput)}>
                   {loading ? "Analyzing..." : "Analyze Transaction"}
                 </Button>
               </div>
@@ -303,14 +304,14 @@ const Simulate = () => {
 
         {/* Payment Link Intelligence Panel */}
         {txnType === "payment_link" && linkAnalysis && (
-          <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
-            <CardHeader className="pb-2">
+          <Card className="glass-card animate-in fade-in-0 slide-in-from-bottom-4 duration-400">
+            <CardHeader className="pb-3 border-b border-border">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Globe className="h-4 w-4 text-primary" />
                 Payment Link Intelligence
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2.5 pt-4">
               {[
                 { label: "Extracted Domain", value: linkAnalysis.domain },
                 { label: "Domain Reputation", value: linkAnalysis.risk === "trusted" ? "Trusted" : linkAnalysis.risk === "new" ? "Suspicious" : "Unknown" },
@@ -318,12 +319,12 @@ const Simulate = () => {
                 { label: "Shortened URL Detection", value: linkAnalysis.isShortened ? "DETECTED" : "NO", flag: linkAnalysis.isShortened },
                 { label: "Risk Contribution Points", value: `+${linkAnalysis.score} pts`, flag: linkAnalysis.score > 0 },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-xs">
+                <div key={item.label} className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">{item.label}</span>
-                  <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${
-                    item.flag ? "bg-danger/15 text-danger border-danger/30" :
-                    linkAnalysis.risk === "trusted" ? "bg-safe/15 text-safe border-safe/30" :
-                    "bg-muted text-foreground border-border"
+                  <Badge variant="outline" className={`text-[10px] px-2 py-0.5 font-medium ${
+                    item.flag ? "bg-danger/10 text-danger border-danger/20" :
+                    linkAnalysis.risk === "trusted" ? "bg-safe/10 text-safe border-safe/20" :
+                    "bg-secondary text-foreground border-border"
                   }`}>
                     {item.value}
                   </Badge>
@@ -334,34 +335,34 @@ const Simulate = () => {
         )}
 
         {result && (
-          <Card className="glass-card rounded-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
-            <CardContent className="p-6 space-y-6">
-              <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
+          <Card className="glass-card animate-in fade-in-0 slide-in-from-bottom-4 duration-400">
+            <CardContent className="p-6 space-y-5">
+              <div className="flex flex-col items-center gap-5 sm:flex-row sm:justify-around">
                 <div className="flex flex-col items-center gap-2">
                   <RiskGauge score={result.riskScore} />
                   {result.confidenceScore !== undefined && (
-                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary border-primary/30">
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary border-primary/20">
                       <Shield className="h-3 w-3 mr-1" />
                       {result.confidenceScore}% confidence
                     </Badge>
                   )}
                 </div>
-                <div className="text-center sm:text-left space-y-2">
-                  <Badge variant="outline" className={`text-sm px-3 py-1 ${riskBadgeStyle(result.riskLevel)}`}>
+                <div className="text-center sm:text-left space-y-3 w-full sm:max-w-[220px]">
+                  <Badge variant="outline" className={`text-sm px-3 py-1 font-medium ${riskBadgeStyle(result.riskLevel)}`}>
                     {riskLabels[result.riskLevel]}
                   </Badge>
-                  <div className="space-y-3 mt-4">
+                  <div className="space-y-3 mt-1">
                     {[
                       { label: "Rule Score", value: result.ruleScore },
                       { label: "ML Score", value: result.mlScore },
                       { label: "Behavioral Score", value: result.behavioralScore },
                     ].map((s) => (
-                      <div key={s.label} className="space-y-1">
-                        <div className="flex justify-between text-xs">
+                      <div key={s.label} className="space-y-1.5">
+                        <div className="flex justify-between text-[11px]">
                           <span className="text-muted-foreground">{s.label}</span>
-                          <span className="font-medium text-foreground">{s.value}</span>
+                          <span className="font-semibold text-foreground">{s.value}</span>
                         </div>
-                        <Progress value={s.value} className="h-2" />
+                        <Progress value={s.value} className="h-1.5 bg-border" />
                       </div>
                     ))}
                   </div>
@@ -379,41 +380,39 @@ const Simulate = () => {
 
               {/* Payment Link Deep Inspection */}
               {result.metrics?.linkDeepInspection && (
-                <Card className="bg-secondary/30 border-border/50">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <Link2 className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Link Deep Inspection</span>
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Link2 className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Link Deep Inspection</span>
+                  </div>
+                  {[
+                    { label: "Domain", value: result.metrics.linkDeepInspection.domain },
+                    { label: "Shortened URL", value: result.metrics.linkDeepInspection.isShortened ? "YES" : "NO", flag: result.metrics.linkDeepInspection.isShortened },
+                    { label: "Suspicious Keywords", value: result.metrics.linkDeepInspection.hasSuspiciousKeywords ? "DETECTED" : "NONE", flag: result.metrics.linkDeepInspection.hasSuspiciousKeywords },
+                    { label: "Lookalike Match", value: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.5 ? `${Math.round(result.metrics.linkDeepInspection.lookalikeSimilarity * 100)}% → ${result.metrics.linkDeepInspection.lookalikeDomain}` : "NONE", flag: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.7 },
+                    { label: "Domain Age (sim)", value: `${result.metrics.linkDeepInspection.domainAgeSimDays}d`, flag: result.metrics.linkDeepInspection.domainAgeSimDays < 30 },
+                    { label: "Link Risk Score", value: `${result.metrics.linkDeepInspection.linkRiskScore}/30`, flag: result.metrics.linkDeepInspection.linkRiskScore > 10 },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">{item.label}</span>
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-medium ${item.flag ? "bg-danger/10 text-danger border-danger/20" : "bg-safe/10 text-safe border-safe/20"}`}>
+                        {item.value}
+                      </Badge>
                     </div>
-                    {[
-                      { label: "Domain", value: result.metrics.linkDeepInspection.domain },
-                      { label: "Shortened URL", value: result.metrics.linkDeepInspection.isShortened ? "YES" : "NO", flag: result.metrics.linkDeepInspection.isShortened },
-                      { label: "Suspicious Keywords", value: result.metrics.linkDeepInspection.hasSuspiciousKeywords ? "DETECTED" : "NONE", flag: result.metrics.linkDeepInspection.hasSuspiciousKeywords },
-                      { label: "Lookalike Match", value: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.5 ? `${Math.round(result.metrics.linkDeepInspection.lookalikeSimilarity * 100)}% → ${result.metrics.linkDeepInspection.lookalikeDomain}` : "NONE", flag: result.metrics.linkDeepInspection.lookalikeSimilarity > 0.7 },
-                      { label: "Domain Age (sim)", value: `${result.metrics.linkDeepInspection.domainAgeSimDays}d`, flag: result.metrics.linkDeepInspection.domainAgeSimDays < 30 },
-                      { label: "Link Risk Score", value: `${result.metrics.linkDeepInspection.linkRiskScore}/30`, flag: result.metrics.linkDeepInspection.linkRiskScore > 10 },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{item.label}</span>
-                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${item.flag ? "bg-danger/15 text-danger border-danger/30" : "bg-safe/15 text-safe border-safe/30"}`}>
-                          {item.value}
-                        </Badge>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
               )}
 
               {result.reasons.length > 0 && (
-                <div className="rounded-xl bg-secondary/50 p-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <AlertCircle className="h-3 w-3" />
                     Why was this flagged?
                   </p>
                   <ul className="space-y-1.5">
                     {result.reasons.map((r, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                      <li key={i} className="flex items-start gap-2 text-[11px] text-foreground">
+                        <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
                         {r}
                       </li>
                     ))}

@@ -397,14 +397,18 @@ const LiveTransactionStream = () => {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
 
         {/* ── Stream ─────────────────────────────────────────────────── */}
-        <Card className="glass-card rounded-2xl lg:col-span-2">
-          <CardHeader className="pb-3">
+        <Card className="glass-card lg:col-span-2">
+          <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary animate-pulse" />
+              <Activity className="h-4 w-4 text-primary" />
               Live Transaction Stream
-              <Badge variant="outline" className="ml-auto text-xs bg-safe/10 text-safe border-safe/30">
-                ● Live
-              </Badge>
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-safe opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-safe"></span>
+                </span>
+                <span className="text-[11px] font-medium text-safe">Live</span>
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -417,63 +421,72 @@ const LiveTransactionStream = () => {
                   return (
                     <motion.div
                       key={txn.id}
-                      initial={{ opacity: 0, y: -20, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: "auto" }}
+                      initial={{ opacity: 0, y: -16 }}
+                      animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
                       onClick={() => handleRowClick(txn)}
-                      className={`flex items-center gap-4 px-6 py-3 transition-colors border-b border-border/50 ${
-                        txn.status === "Fraud" ? "bg-danger/5" : ""
-                      } ${selectedDetail?.id === txn.id ? "bg-primary/5" : ""} cursor-pointer hover:bg-secondary/30`}
+                      className={`flex items-stretch border-b border-border/50 cursor-pointer transition-colors
+                        ${txn.status === "Fraud" ? "bg-danger/3" : ""}
+                        ${selectedDetail?.id === txn.id ? "bg-primary/5" : "hover:bg-secondary/50"}`}
                     >
-                      {/* Status icon */}
-                      <div className="shrink-0">
-                        {isProcessing ? (
-                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                        ) : txn.status === "Fraud" ? (
-                          <XCircle className="h-4 w-4 text-danger" />
-                        ) : txn.riskScore >= 70 ? (
-                          <AlertTriangle className="h-4 w-4 text-danger" />
-                        ) : txn.riskScore >= 50 ? (
-                          <AlertTriangle className="h-4 w-4 text-warning" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 text-safe" />
-                        )}
-                      </div>
+                      {/* Left color indicator bar */}
+                      <div className={`w-1 shrink-0 rounded-l ${
+                        isProcessing ? "bg-primary/40" :
+                        txn.status === "Fraud" || txn.riskScore >= 70 ? "bg-danger" :
+                        txn.riskScore >= 50 ? "bg-warning" : "bg-safe"
+                      }`} />
 
-                      {/* Transaction data */}
-                      <div className="min-w-0 flex-1 grid grid-cols-5 gap-2 items-center text-xs">
-                        <span className="text-muted-foreground font-mono truncate">{txn.id}</span>
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 w-fit">
-                          {txnTypeLabels[(txn as any)._txnType] || "Standard"}
-                        </Badge>
-                        <span className="font-medium text-foreground">₹{txn.amount.toLocaleString("en-IN")}</span>
-                        <span className="text-muted-foreground truncate">{txn.location}</span>
-                        <span className="text-muted-foreground truncate">{txn.upiId || "—"}</span>
-                      </div>
+                      <div className="flex flex-1 items-center gap-4 px-4 py-3">
+                        {/* Status icon */}
+                        <div className="shrink-0">
+                          {isProcessing ? (
+                            <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                          ) : txn.status === "Fraud" ? (
+                            <XCircle className="h-3.5 w-3.5 text-danger" />
+                          ) : txn.riskScore >= 70 ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-danger" />
+                          ) : txn.riskScore >= 50 ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                          ) : (
+                            <CheckCircle className="h-3.5 w-3.5 text-safe" />
+                          )}
+                        </div>
 
-                      {/* Score + lifecycle state */}
-                      <div className="shrink-0 flex flex-col items-end gap-1">
-                        <span className={`text-xs font-semibold ${
-                          txn.riskScore >= 70 ? "text-danger" : txn.riskScore >= 50 ? "text-warning" : "text-safe"
-                        }`}>
-                          {txn.riskScore}
-                        </span>
-                        {lc && (
-                          <Badge variant="outline" className={`text-[8px] px-1 py-0 leading-tight ${lifecycleBadgeStyle[lc.state]}`}>
-                            {isProcessing ? (
-                              <span className="flex items-center gap-0.5">
-                                <Loader2 className="h-2 w-2 animate-spin" />
-                                {lc.state === "RISK_CHECK_IN_PROGRESS" ? "Rule Check" :
-                                 lc.state === "HYBRID_MODEL_EVALUATION" ? "ML Check" :
-                                 lc.state === "DECISION_PENDING" ? "Deciding" : "Starting"}
-                              </span>
-                            ) : lc.state === "COMPLETED" ? "Sent ✓" :
-                               lc.state === "SAFE_APPROVED" ? "Approved" :
-                               lc.state === "WARNING_FLAGGED" ? "Flagged" :
-                               lc.state === "HIGH_RISK_FLAGGED" ? "Blocked" : lc.state}
+                        {/* Transaction data */}
+                        <div className="min-w-0 flex-1 grid grid-cols-5 gap-2 items-center">
+                          <span className="text-[10px] text-muted-foreground font-mono truncate">{txn.id}</span>
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 w-fit border-border">
+                            {txnTypeLabels[(txn as any)._txnType] || "Standard"}
                           </Badge>
-                        )}
+                          <span className="text-xs font-semibold text-foreground">₹{txn.amount.toLocaleString("en-IN")}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">{txn.location}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">{txn.upiId || "—"}</span>
+                        </div>
+
+                        {/* Score + lifecycle badge */}
+                        <div className="shrink-0 flex flex-col items-end gap-1 min-w-[56px]">
+                          <span className={`text-sm font-bold tabular-nums ${
+                            txn.riskScore >= 70 ? "text-danger" : txn.riskScore >= 50 ? "text-warning" : "text-safe"
+                          }`}>
+                            {txn.riskScore}
+                          </span>
+                          {lc && (
+                            <Badge variant="outline" className={`text-[8px] px-1.5 py-0 leading-tight ${lifecycleBadgeStyle[lc.state]}`}>
+                              {isProcessing ? (
+                                <span className="flex items-center gap-0.5">
+                                  <Loader2 className="h-2 w-2 animate-spin" />
+                                  {lc.state === "RISK_CHECK_IN_PROGRESS" ? "Rules" :
+                                   lc.state === "HYBRID_MODEL_EVALUATION" ? "ML" :
+                                   lc.state === "DECISION_PENDING" ? "Deciding" : "Starting"}
+                                </span>
+                              ) : lc.state === "COMPLETED" ? "Sent ✓" :
+                                 lc.state === "SAFE_APPROVED" ? "Approved" :
+                                 lc.state === "WARNING_FLAGGED" ? "Flagged" :
+                                 lc.state === "HIGH_RISK_FLAGGED" ? "Blocked" : lc.state}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -484,8 +497,8 @@ const LiveTransactionStream = () => {
         </Card>
 
         {/* ── Risk Analysis Panel ─────────────────────────────────────── */}
-        <Card className="glass-card rounded-2xl">
-          <CardHeader className="pb-3">
+        <Card className="glass-card">
+          <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-primary" />
               Risk Analysis
