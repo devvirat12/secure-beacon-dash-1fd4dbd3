@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
-
+import TransactionsTable from "@/components/TransactionsTable";
 import ReceiverRiskPanel from "@/components/ReceiverRiskPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -440,6 +440,8 @@ const Simulate = () => {
             onConfirm={handleConfirm}
           />
         )}
+
+        <TransactionsTable />
       </main>
     </div>
   );
