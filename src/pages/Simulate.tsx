@@ -2,7 +2,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import RiskGauge from "@/components/RiskGauge";
 import ConfirmationModal from "@/components/ConfirmationModal";
-import SimulationControls, { SimulationFlags } from "@/components/SimulationControls";
+import SimulationControls from "@/components/SimulationControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,13 +72,13 @@ const Simulate = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
-  const [simFlags, setSimFlags] = useState<SimulationFlags>({
-    highAmount: false,
-    newUpiId: false,
-    firstTimeBeneficiary: false,
-    paymentLink: false,
-    nightTransaction: false,
-  });
+  const simFlags = {
+    highAmount: true,
+    newUpiId: true,
+    firstTimeBeneficiary: true,
+    paymentLink: true,
+    nightTransaction: true,
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,10 +176,7 @@ const Simulate = () => {
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
         {/* Simulation Control Panel */}
-        <SimulationControls
-          flags={simFlags}
-          onFlagsChange={setSimFlags}
-        />
+        <SimulationControls />
 
         {/* Analyze Transaction */}
         <Card className="glass-card rounded-2xl">
