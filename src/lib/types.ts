@@ -39,3 +39,40 @@ export interface RiskTrendPoint {
   date: string;
   score: number;
 }
+
+// --- Dataset-driven types ---
+
+export interface HistoricalTransaction {
+  transactionId: string;
+  userId: string;
+  amount: number;
+  timestamp: string;
+  location: string;
+  category: string;
+}
+
+export interface DatasetUser {
+  userId: string;
+  monthlyIncome: number;
+  avgTransactionAmount: number;
+  avgMonthlySpend: number;
+  avgWeeklyFrequency: number;
+  usualLocations: string[];
+  transactionHistory: HistoricalTransaction[];
+}
+
+export interface DeviationMetrics {
+  amountDeviation: number;
+  monthlySpendRatio: number;
+  locationFlag: boolean;
+  frequencySpike: boolean;
+}
+
+export interface ScoringResult extends AnalysisResult {
+  metrics: DeviationMetrics;
+}
+
+export interface LiveTransaction extends Transaction {
+  userId: string;
+  metrics?: DeviationMetrics;
+}
